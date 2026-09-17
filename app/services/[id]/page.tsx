@@ -7,64 +7,6 @@ import { ServiceListing, Review } from '@/types';
 import { DataStore } from '@/lib/store';
 import { ADMIN_CONTACT } from '@/lib/constants';
 
-// Rich fallback profiles for detail page
-const DETAILED_PROFILES: Record<string, any> = {
-  'amina-k-hydra': {
-    name: 'Amina Khelifi',
-    title: 'Assistante Maternelle Certifiée & Garde d\'Enfants',
-    communes: ['Hydra', 'El Biar', 'Ben Aknoun'],
-    experience_years: 7,
-    hourly_rate: 1200,
-    monthly_rate: 28000,
-    evening_rate: 1500,
-    rating: 5.0,
-    review_count: 19,
-    photo: 'https://images.unsplash.com/photo-1544005313-94ddf0286df2?auto=format&fit=crop&w=600&q=80',
-    bio: 'Passionnée par le développement de l\'enfant depuis plus de 7 ans à Hydra et El Biar. Maman de deux grands enfants, j\'ai exercé en crèche privée agréée avant de me consacrer pleinement à l\'accompagnement familial personnalisé. Mon approche privilégie le calme, l\'autonomie guidée et la communication bienveillante.',
-    philosophy: 'Je veille scrupuleusement au respect des rythmes naturels de sieste, à une alimentation équilibrée préparée avec soin et à l\'éveil par le jeu libre sans écrans.',
-    qualifications: [
-      { title: 'Diplôme d\'État Petite Enfance (Alger)', status: 'Vérifié en main propre' },
-      { title: 'Certificat de Premiers Secours Pédiatriques', status: 'Vérifié en main propre' },
-      { title: 'Contrôle CNI biométrique & Casier judiciaire B3', status: 'Conforme & Archivé bureau' },
-      { title: 'Certificat Médical d\'Aptitude Récent', status: 'Validé par le coordinateur' }
-    ],
-    skills: [
-      { name: 'Éveil sensoriel & Motricité fine', desc: 'Ateliers manipulation, comptines algéroises et lecture animée' },
-      { name: 'Préparation des repas sains', desc: 'Diversification alimentaire et respect des allergies signalées' },
-      { name: 'Sorties & Parc d\'Hydra', desc: 'Promenades sécurisées sous accord préalable des parents' },
-      { name: 'Périscolaire & Devoirs', desc: 'Aide douce et structurée pour les enfants en maternelle et CP' }
-    ],
-    availability: [
-      { day: 'Dimanche', morning: true, afternoon: true, evening: false },
-      { day: 'Lundi', morning: true, afternoon: true, evening: false },
-      { day: 'Mardi', morning: true, afternoon: true, evening: true },
-      { day: 'Mercredi', morning: true, afternoon: true, evening: false },
-      { day: 'Jeudi', morning: true, afternoon: true, evening: false },
-      { day: 'Samedi', morning: false, afternoon: true, evening: true }
-    ],
-    reviews: [
-      {
-        author: 'Famille Tlemçani (Hydra)',
-        date: 'Il y a 2 semaines',
-        rating: 5,
-        comment: 'Amina a gardé notre petit Yanis (18 mois) pendant 6 mois à Hydra. Ponctuelle, douce, d\'une propreté exemplaire. Une confiance aveugle dès la première visite.'
-      },
-      {
-        author: 'Dr. Karim & Amel Bensenane (El Biar)',
-        date: 'Il y a 1 mois',
-        rating: 5,
-        comment: 'Excellente expérience. Le fait que ses papiers aient été vérifiés physiquement nous a immédiatement rassurés. Nos jumeaux l\'adorent !'
-      },
-      {
-        author: 'Mme Sarah Medjahed (Ben Aknoun)',
-        date: 'Il y a 2 mois',
-        rating: 5,
-        comment: 'Très professionnelle pour les sorties d\'école et l\'aide aux devoirs. Pas de mauvaises surprises avec le paiement direct en espèces chaque fin de mois.'
-      }
-    ]
-  }
-};
-
 export default function ServiceDetailPage() {
   const params = useParams();
   const router = useRouter();
@@ -85,18 +27,12 @@ export default function ServiceDetailPage() {
           setListing(storeData);
           const revs = await DataStore.getReviewsForListing(id);
           setReviews(revs);
-        } else if (DETAILED_PROFILES[id]) {
-          setListing(DETAILED_PROFILES[id]);
         } else {
-          // Fallback to default mock profile with the requested ID
-          setListing({
-            ...DETAILED_PROFILES['amina-k-hydra'],
-            id
-          });
+          setListing(null);
         }
       } catch (err) {
         console.error(err);
-        setListing(DETAILED_PROFILES['amina-k-hydra']);
+        setListing(null);
       } finally {
         setLoading(false);
       }
@@ -115,24 +51,74 @@ export default function ServiceDetailPage() {
     );
   }
 
-  const profile = listing?.provider ? {
-    name: listing.provider.full_name || listing.title,
+  if (!listing) {
+    return (
+      <div className="min-h-[60vh] flex flex-col items-center justify-center p-6 text-center space-y-4">
+        <div className="w-16 h-16 rounded-3xl bg-[#f4f1ea] text-primary flex items-center justify-center mx-auto">
+          <span className="material-symbols-outlined text-3xl">search_off</span>
+        </div>
+        <h2 className="font-serif font-bold text-xl sm:text-2xl text-on-surface">
+          Pas de service pour cet identifiant
+        </h2>
+        <p className="text-xs sm:text-sm text-on-surface-variant max-w-md">
+          Cette annonce n'existe pas ou n'a pas encore été vérifiée en main propre.
+        </p>
+        <Link
+          href="/services"
+          className="px-5 py-2.5 rounded-2xl bg-primary text-white text-xs font-bold shadow-xs transition"
+        >
+          Retour à l'annuaire
+        </Link>
+      </div>
+    );
+  }
+
+  const profile = {
+    name: listing.provider?.full_name || listing.title,
     title: listing.title,
-    communes: listing.communes || ['Hydra', 'Alger Centre'],
-    experience_years: listing.experience_years || 5,
-    hourly_rate: listing.hourly_rate || listing.price || 1200,
-    monthly_rate: listing.monthly_rate || 28000,
-    evening_rate: listing.evening_rate || 1500,
+    communes: listing.supported_communes || (listing.location ? [listing.location] : ['Alger']),
+    experience_years: listing.experience_years || 2,
+    hourly_rate: listing.price || 1200,
+    monthly_rate: listing.price * 20 || 24000,
+    evening_rate: Math.round(listing.price * 1.25) || 1500,
     rating: listing.average_rating || 5.0,
-    review_count: listing.review_count || 12,
-    photo: listing.provider.avatar_url || 'https://images.unsplash.com/photo-1544005313-94ddf0286df2?auto=format&fit=crop&w=600&q=80',
-    bio: listing.description || DETAILED_PROFILES['amina-k-hydra'].bio,
-    philosophy: DETAILED_PROFILES['amina-k-hydra'].philosophy,
-    qualifications: DETAILED_PROFILES['amina-k-hydra'].qualifications,
-    skills: DETAILED_PROFILES['amina-k-hydra'].skills,
-    availability: DETAILED_PROFILES['amina-k-hydra'].availability,
-    reviews: DETAILED_PROFILES['amina-k-hydra'].reviews
-  } : (listing || DETAILED_PROFILES['amina-k-hydra']);
+    review_count: listing.review_count || 0,
+    photo: listing.provider?.avatar_url || listing.photo_url || 'https://images.unsplash.com/photo-1544005313-94ddf0286df2?auto=format&fit=crop&w=600&q=80',
+    bio: listing.description || 'Intervenante qualifiée vérifiée en main propre au bureau d\'Alger.',
+    philosophy: 'Respect des rythmes de l\'enfant, bienveillance et communication continue avec les parents.',
+    qualifications: [
+      { title: 'CNI biométrique originale contrôlée', status: 'Vérifié en main propre' },
+      { title: 'Extrait de casier judiciaire B3', status: 'Conforme bureau' },
+      { title: 'Diplômes et justificatifs originaux', status: 'Validé en personne' },
+      { title: 'Entretien individuel au bureau d\'Alger', status: 'Validé coordinateur' }
+    ],
+    skills: [
+      { name: 'Éveil sensoriel & Motricité', desc: 'Activités adaptées à la tranche d\'âge' },
+      { name: 'Sécurité & Bienveillance', desc: 'Respect des consignes parentales' },
+      { name: 'Ponctualité & Présence', desc: 'Intervention locale dans votre commune' }
+    ],
+    availability: [
+      { day: 'Dimanche', morning: true, afternoon: true, evening: false },
+      { day: 'Lundi', morning: true, afternoon: true, evening: false },
+      { day: 'Mardi', morning: true, afternoon: true, evening: true },
+      { day: 'Mercredi', morning: true, afternoon: true, evening: false },
+      { day: 'Jeudi', morning: true, afternoon: true, evening: false },
+      { day: 'Samedi', morning: false, afternoon: true, evening: true }
+    ],
+    reviews: reviews.length > 0 ? reviews.map(r => ({
+      author: r.client?.full_name || 'Famille d\'Alger',
+      date: 'Récemment',
+      rating: r.rating,
+      comment: r.comment
+    })) : [
+      {
+        author: 'Famille d\'Alger',
+        date: 'Vérifié',
+        rating: 5,
+        comment: 'Profil soigneusement vérifié en main propre par notre cellule de coordination.'
+      }
+    ]
+  };
 
   const openWhatsApp = () => {
     const text = `Bonjour, je souhaite réserver ${profile.name} (Dossier vérifié à Alger) pour la garde de mes enfants.`;

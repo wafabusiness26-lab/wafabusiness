@@ -43,20 +43,7 @@ export default function BookServicePage() {
           setListing(data);
           if (data.supported_communes?.[0]) setCommune(data.supported_communes[0]); else if (data.location) setCommune(data.location);
         } else {
-          // Fallback mock profile
-          setListing({
-            id,
-            title: 'Assistante Maternelle & Garde d\'Enfants',
-            provider: {
-              full_name: 'Amina K.',
-              avatar_url: 'https://images.unsplash.com/photo-1544005313-94ddf0286df2?auto=format&fit=crop&w=400&q=80',
-              verification_status: 'verifie_en_main_propre'
-            },
-            communes: ['Hydra', 'El Biar'],
-            experience_years: 7,
-            price: 1200,
-            price_unit: 'heure'
-          });
+          setListing(null);
         }
       } catch (err) {
         console.error(err);
@@ -86,10 +73,32 @@ export default function BookServicePage() {
     );
   }
 
-  const providerName = listing?.provider?.full_name || listing?.title || 'Amina K.';
-  const providerRole = listing?.title || 'Assistante Maternelle';
-  const providerPhoto = listing?.provider?.avatar_url || 'https://images.unsplash.com/photo-1544005313-94ddf0286df2?auto=format&fit=crop&w=400&q=80';
-  const providerRate = listing?.price || listing?.hourly_rate || 1200;
+  if (!listing) {
+    return (
+      <div className="min-h-[60vh] flex flex-col items-center justify-center p-6 text-center space-y-4">
+        <div className="w-16 h-16 rounded-3xl bg-[#f4f1ea] text-primary flex items-center justify-center mx-auto">
+          <span className="material-symbols-outlined text-3xl">search_off</span>
+        </div>
+        <h2 className="font-serif font-bold text-xl sm:text-2xl text-on-surface">
+          Pas de service pour cet identifiant
+        </h2>
+        <p className="text-xs sm:text-sm text-on-surface-variant max-w-md">
+          Cette annonce n'existe pas ou n'a pas encore été vérifiée en main propre.
+        </p>
+        <Link
+          href="/services"
+          className="px-5 py-2.5 rounded-2xl bg-primary text-white text-xs font-bold shadow-xs transition"
+        >
+          Retour aux services
+        </Link>
+      </div>
+    );
+  }
+
+  const providerName = listing.provider?.full_name || listing.title;
+  const providerRole = listing.title;
+  const providerPhoto = listing.provider?.avatar_url || listing.photo_url || 'https://images.unsplash.com/photo-1544005313-94ddf0286df2?auto=format&fit=crop&w=400&q=80';
+  const providerRate = listing.price || 1200;
 
   const handleSubmitBooking = async (e: React.FormEvent) => {
     e.preventDefault();

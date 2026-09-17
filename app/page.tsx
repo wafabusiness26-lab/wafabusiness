@@ -7,52 +7,6 @@ import { ServiceListing } from '@/types';
 import { DataStore } from '@/lib/store';
 import { ALGER_COMMUNES, ADMIN_CONTACT } from '@/lib/constants';
 
-// Featured backup profiles if store has empty listings
-const FEATURED_PROFILES = [
-  {
-    id: 'amina-k-hydra',
-    name: 'Tata Amina K.',
-    role: 'Assistante Maternelle & Nounou',
-    commune: 'Hydra',
-    experience: '7 ans d\'expérience',
-    photo: 'https://images.unsplash.com/photo-1544005313-94ddf0286df2?auto=format&fit=crop&w=400&q=80',
-    skills: ['Diplôme Petite Enfance', 'Secourisme Pédiatrique', 'Éveil Montessori'],
-    price: '1 200 DA',
-    priceUnit: '/ h',
-    reviewsCount: 19,
-    rating: 5.0,
-    badgeText: 'Contrôlée au bureau d\'Alger'
-  },
-  {
-    id: 'karima-b-kouba',
-    name: 'Professeure Karima B.',
-    role: 'Enseignante Primaire & CEM',
-    commune: 'Kouba',
-    experience: '11 ans d\'expérience',
-    photo: 'https://images.unsplash.com/photo-1573496359142-b8d87734a5a2?auto=format&fit=crop&w=400&q=80',
-    skills: ['Licence Mathématiques', 'Préparation BEM', 'Pédagogie Positive'],
-    price: '1 800 DA',
-    priceUnit: '/ séance',
-    reviewsCount: 24,
-    rating: 4.9,
-    badgeText: 'Diplômes & CNI vérifiés'
-  },
-  {
-    id: 'samia-t-cheraga',
-    name: 'Tata Samia T.',
-    role: 'Garde Périscolaire & Éveil',
-    commune: 'Chéraga',
-    experience: '5 ans d\'expérience',
-    photo: 'https://images.unsplash.com/photo-1580489944761-15a19d654956?auto=format&fit=crop&w=400&q=80',
-    skills: ['Ancienne Aide-Maternelle', 'Aide aux devoirs', 'Rythme du sommeil'],
-    price: '28 000 DA',
-    priceUnit: '/ mois',
-    reviewsCount: 14,
-    rating: 5.0,
-    badgeText: 'Entretien physique validé'
-  }
-];
-
 export default function HomePage() {
   const router = useRouter();
   const [activeTab, setActiveTab] = useState<'babysitting' | 'teaching'>('babysitting');
@@ -70,6 +24,8 @@ export default function HomePage() {
         const data = await DataStore.getListings();
         // Strict hand-to-hand verification rule: only verified providers can appear
         const verified = data.filter(item => item.provider?.verification_status === "verifie_en_main_propre" || item.provider?.id_card_verified);
+        // Sort real-time best ranked services first
+        verified.sort((a, b) => (b.average_rating || 0) - (a.average_rating || 0));
         setListings(verified);
       } catch (err) {
         console.error(err);
@@ -374,101 +330,127 @@ export default function HomePage() {
             </Link>
           </div>
 
-          {/* Cards Grid */}
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
-            {(listings.length > 0 ? listings.slice(0, 3) : FEATURED_PROFILES).map((item: any) => {
-              const isStoreItem = !!item.provider;
-              const id = item.id;
-              const name = isStoreItem ? (item.provider?.full_name || item.title) : item.name;
-              const role = isStoreItem ? item.title : item.role;
-              const commune = isStoreItem ? (item.communes?.[0] || 'Alger') : item.commune;
-              const experience = isStoreItem ? (item.experience_years ? `${item.experience_years} ans d'expérience` : 'Expérimentée') : item.experience;
-              const photo = isStoreItem ? (item.provider?.avatar_url || 'https://images.unsplash.com/photo-1544005313-94ddf0286df2?auto=format&fit=crop&w=400&q=80') : item.photo;
-              const skills = isStoreItem ? (item.diplomas?.slice(0, 3) || ['Garde active', 'Vérifiée en personne']) : item.skills;
-              const price = isStoreItem ? `${item.hourly_rate || item.base_price || 1200} DA` : item.price;
-              const priceUnit = isStoreItem ? ` / ${item.price_unit || 'h'}` : item.priceUnit;
-
-              return (
-                <div
-                  key={id}
-                  className="bg-surface-container-lowest rounded-3xl overflow-hidden shadow-sm border border-[#ded7ca] hover:shadow-xl transition flex flex-col group"
+          {/* Real-time Best Ranked Services or Authentic Empty State */}
+          {loading ? (
+            <div className="py-16 text-center space-y-3">
+              <span className="material-symbols-outlined text-3xl text-primary animate-spin">
+                progress_activity
+              </span>
+              <p className="text-xs text-on-surface-variant">Recherche des profils vérifiés en temps réel...</p>
+            </div>
+          ) : listings.length === 0 ? (
+            <div className="bg-surface-container-lowest rounded-3xl p-8 sm:p-14 border border-[#ded7ca] text-center max-w-2xl mx-auto space-y-4 shadow-sm">
+              <div className="w-16 h-16 rounded-3xl bg-[#f4f1ea] text-primary flex items-center justify-center mx-auto">
+                <span className="material-symbols-outlined text-3xl">verified_user</span>
+              </div>
+              <div className="space-y-2">
+                <h3 className="font-serif text-xl sm:text-2xl font-bold text-on-surface">
+                  Pas de services pour maintenant
+                </h3>
+                <p className="text-xs sm:text-sm text-on-surface-variant max-w-md mx-auto leading-relaxed">
+                  Aucun prestataire n'a encore été validé. Seuls les profils dont l'identité et les diplômes ont été contrôlés physiquement en main propre au bureau apparaîtront ici.
+                </p>
+              </div>
+              <div className="pt-2 flex flex-wrap items-center justify-center gap-3">
+                <Link
+                  href="/devenir-prestataire"
+                  className="px-5 py-2.5 rounded-2xl bg-secondary hover:bg-secondary-600 text-white font-bold text-xs shadow-xs transition flex items-center gap-1.5"
                 >
-                  {/* Image Frame & Badges */}
-                  <div className="relative h-60 w-full overflow-hidden bg-surface-container">
-                    <img
-                      src={photo}
-                      alt={name}
-                      className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
-                    />
-                    
-                    {/* Honey Gold Physical Verification Seal */}
-                    <div className="absolute top-3 left-3 bg-white/95 backdrop-blur-md px-3 py-1 rounded-full flex items-center gap-1.5 shadow-sm border border-[#D4A373]">
-                      <span className="material-symbols-outlined text-[#b7895b] text-base material-symbols-fill">verified</span>
-                      <span className="text-[10px] font-bold text-[#623f18] uppercase tracking-wide">
-                        Vérifiée en Main Propre
-                      </span>
+                  <span className="material-symbols-outlined text-sm">person_add</span>
+                  <span>Vous êtes nounou ou enseignant ? Rejoignez-nous</span>
+                </Link>
+                <a
+                  href={`tel:${ADMIN_CONTACT.phone}`}
+                  className="px-5 py-2.5 rounded-2xl bg-[#FAF8F5] border border-[#ded7ca] text-on-surface font-bold text-xs hover:bg-[#ede8df] transition flex items-center gap-1.5"
+                >
+                  <span className="material-symbols-outlined text-sm">call</span>
+                  <span>Permanence Alger : {ADMIN_CONTACT.phone}</span>
+                </a>
+              </div>
+            </div>
+          ) : (
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
+              {listings.slice(0, 3).map((item: any) => {
+                const id = item.id;
+                const name = item.provider?.full_name || item.title;
+                const role = item.title;
+                const commune = item.supported_communes?.[0] || item.location || 'Alger';
+                const experience = item.experience_years ? `${item.experience_years} ans d'expérience` : 'Expérimentée';
+                const photo = item.provider?.avatar_url || item.photo_url || 'https://images.unsplash.com/photo-1544005313-94ddf0286df2?auto=format&fit=crop&w=400&q=80';
+                const price = item.price || 1200;
+                const priceUnit = item.price_unit || 'h';
+                const rating = item.average_rating || 5.0;
+
+                return (
+                  <div
+                    key={id}
+                    className="bg-surface-container-lowest rounded-3xl overflow-hidden shadow-sm border border-[#ded7ca] hover:shadow-xl transition flex flex-col group"
+                  >
+                    {/* Image Frame & Badges */}
+                    <div className="relative h-60 w-full overflow-hidden bg-surface-container">
+                      <img
+                        src={photo}
+                        alt={name}
+                        className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
+                      />
+                      
+                      {/* Honey Gold Physical Verification Seal */}
+                      <div className="absolute top-3 left-3 bg-white/95 backdrop-blur-md px-3 py-1 rounded-full flex items-center gap-1.5 shadow-sm border border-[#D4A373]">
+                        <span className="material-symbols-outlined text-[#b7895b] text-base material-symbols-fill">verified</span>
+                        <span className="text-[10px] font-bold text-[#623f18] uppercase tracking-wide">
+                          Vérifiée en Main Propre
+                        </span>
+                      </div>
+
+                      {/* Commune Tag */}
+                      <div className="absolute bottom-3 left-3 bg-black/60 backdrop-blur-md text-white px-3 py-1 rounded-full text-xs font-semibold flex items-center gap-1">
+                        <span className="material-symbols-outlined text-sm text-[#ffb59e]">location_on</span>
+                        <span>{commune}, Alger</span>
+                      </div>
                     </div>
 
-                    {/* Commune Tag */}
-                    <div className="absolute bottom-3 left-3 bg-black/60 backdrop-blur-md text-white px-3 py-1 rounded-full text-xs font-semibold flex items-center gap-1">
-                      <span className="material-symbols-outlined text-sm text-[#ffb59e]">location_on</span>
-                      <span>{commune}, Alger</span>
-                    </div>
-                  </div>
-
-                  {/* Card Content */}
-                  <div className="p-6 flex-1 flex flex-col justify-between space-y-4">
-                    <div className="space-y-2">
-                      <div className="flex items-center justify-between">
-                        <h3 className="font-serif text-lg font-bold text-on-surface">
-                          {name}
-                        </h3>
-                        <div className="flex items-center gap-1 text-[#b7895b] text-xs font-bold">
-                          <span className="material-symbols-outlined text-sm material-symbols-fill">star</span>
-                          <span>5.0</span>
+                    {/* Card Content */}
+                    <div className="p-6 flex-1 flex flex-col justify-between space-y-4">
+                      <div className="space-y-2">
+                        <div className="flex items-center justify-between">
+                          <h3 className="font-serif text-lg font-bold text-on-surface">
+                            {name}
+                          </h3>
+                          <div className="flex items-center gap-1 text-[#b7895b] text-xs font-bold">
+                            <span className="material-symbols-outlined text-sm material-symbols-fill">star</span>
+                            <span>{rating.toFixed(1)}</span>
+                          </div>
                         </div>
+
+                        <p className="text-xs text-primary font-semibold">{role}</p>
+                        <p className="text-xs text-on-surface-variant">{experience}</p>
                       </div>
 
-                      <p className="text-xs text-primary font-semibold">{role}</p>
-                      <p className="text-xs text-on-surface-variant">{experience}</p>
-
-                      {/* Skills Badges */}
-                      <div className="flex flex-wrap gap-1.5 pt-2">
-                        {skills.map((skill: string, idx: number) => (
-                          <span
-                            key={idx}
-                            className="text-[10px] font-medium bg-[#f4f1ea] text-on-surface-variant px-2.5 py-1 rounded-full"
-                          >
-                            {skill}
+                      {/* Pricing & CTA */}
+                      <div className="pt-4 border-t border-[#ded7ca] flex items-center justify-between">
+                        <div>
+                          <span className="text-[10px] text-on-surface-variant uppercase font-bold block">
+                            Tarif convenu
                           </span>
-                        ))}
-                      </div>
-                    </div>
+                          <span className="font-bold text-sm text-primary">
+                            {price.toLocaleString()} DA <span className="text-[11px] text-on-surface-variant font-normal">/ {priceUnit}</span>
+                          </span>
+                        </div>
 
-                    {/* Pricing & CTA */}
-                    <div className="pt-4 border-t border-[#ded7ca] flex items-center justify-between">
-                      <div>
-                        <span className="text-[10px] text-on-surface-variant uppercase font-bold block">
-                          Tarif convenu
-                        </span>
-                        <span className="font-bold text-sm text-primary">
-                          {price} <span className="text-[11px] text-on-surface-variant font-normal">{priceUnit}</span>
-                        </span>
+                        <Link
+                          href={`/services/${id}`}
+                          className="px-4 py-2 rounded-xl bg-primary hover:bg-primary-600 text-white text-xs font-bold shadow-sm transition"
+                        >
+                          Consulter Profil
+                        </Link>
                       </div>
 
-                      <Link
-                        href={`/services/${id}`}
-                        className="px-4 py-2 rounded-xl bg-primary hover:bg-primary-600 text-white text-xs font-bold shadow-sm transition"
-                      >
-                        Consulter Profil
-                      </Link>
                     </div>
-
                   </div>
-                </div>
-              );
-            })}
-          </div>
+                );
+              })}
+            </div>
+          )}
 
         </div>
       </section>
