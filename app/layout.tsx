@@ -19,7 +19,7 @@ export default function RootLayout({
     <html lang="fr" className="h-full">
       <body className="flex min-h-full flex-col bg-slate-50 text-slate-900 antialiased selection:bg-indigo-500 selection:text-white">
         <AuthProvider>
-          <RoleSwitcher />
+          {process.env.NODE_ENV === 'development' && <RoleSwitcher />}
           <Navbar />
           <main className="flex-1">
             {children}

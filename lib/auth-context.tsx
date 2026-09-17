@@ -176,12 +176,13 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       id: newId,
       role: data.role,
       full_name: data.full_name,
-      phone: data.phone || '+1 (555) 000-1122',
-      location: data.location || 'Local Metro',
+      phone: data.phone || '0550 12 34 56',
+      location: data.location || 'Alger Centre',
       avatar_url: data.role === 'provider' 
         ? 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=150&auto=format&fit=crop&q=80'
         : 'https://images.unsplash.com/photo-1494790108377-be9c29b29330?w=150&auto=format&fit=crop&q=80',
       created_at: new Date().toISOString(),
+      verification_status: data.role === 'provider' ? 'en_attente_physique' : 'non_verifie',
     };
 
     await DataStore.saveProfile(newProf);
