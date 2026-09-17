@@ -6,22 +6,9 @@ import { ServiceRequest } from '@/types';
 import { DataStore } from '@/lib/store';
 import { useAuth } from '@/lib/auth-context';
 import { ReviewModal } from '@/components/ReviewModal';
-import { StarRating } from '@/components/StarRating';
 import { TimelineTracker } from '@/components/TimelineTracker';
-import { AdminCallCard } from '@/components/AdminCallCard';
 import { getStatusBadgeStyle, formatDate, formatPrice, getCategoryBadge } from '@/lib/utils';
-import { 
-  Calendar, 
-  Clock, 
-  PhoneCall, 
-  Star, 
-  CheckCircle2, 
-  Loader2, 
-  ArrowRight,
-  ChevronRight,
-  ShieldCheck,
-  MapPin
-} from 'lucide-react';
+import { ADMIN_CONTACT } from '@/lib/constants';
 
 export default function ClientRequestsPage() {
   const { profile, user } = useAuth();
@@ -61,204 +48,223 @@ export default function ClientRequestsPage() {
   });
 
   return (
-    <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-10 space-y-8">
-      
-      {/* En-tête */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-slate-200/80 pb-6">
-        <div>
-          <span className="text-xs font-bold uppercase tracking-wider text-indigo-600 bg-indigo-50 px-2.5 py-1 rounded-md">
-            Espace Famille
-          </span>
-          <h1 className="text-2xl sm:text-3xl font-black text-slate-900 mt-1">
-            Mes Réservations & Demandes de Service
-          </h1>
-          <p className="text-xs sm:text-sm text-slate-500 mt-0.5">
-            Suivez l'avancement de vos demandes coordonnées par notre équipe à Alger.
-          </p>
-        </div>
+    <div className="w-full bg-[#FAF8F5] min-h-screen py-8 px-4 sm:px-6 lg:px-8">
+      <div className="max-w-6xl mx-auto space-y-8">
+        
+        {/* En-tête Espace Famille */}
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-[#ded7ca] pb-6">
+          <div className="space-y-1">
+            <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-primary-fixed/50 text-primary text-xs font-bold">
+              <span className="material-symbols-outlined text-sm">home</span>
+              <span>Espace Famille • Wilaya d'Alger</span>
+            </div>
+            <h1 className="font-serif text-2xl sm:text-3xl font-bold text-on-surface">
+              Mes Réservations &amp; Demandes de Garde
+            </h1>
+            <p className="text-xs sm:text-sm text-on-surface-variant">
+              Suivez en direct l'avancement de vos demandes coordonnées par téléphone avec notre équipe d'Alger.
+            </p>
+          </div>
 
-        <Link
-          href="/services"
-          className="inline-flex items-center gap-1.5 px-5 py-2.5 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-bold shadow-md transition"
-        >
-          <span>Réserver un autre service</span>
-          <ArrowRight className="w-4 h-4" />
-        </Link>
-      </div>
-
-      {/* Filtres de statut */}
-      <div className="flex items-center gap-2 overflow-x-auto pb-2">
-        {[
-          { key: 'all', label: `Toutes (${requests.length})` },
-          { key: 'active', label: `En cours (${requests.filter(r => r.status === 'new' || r.status === 'in_progress').length})` },
-          { key: 'completed', label: `Terminées (${requests.filter(r => r.status === 'completed').length})` },
-          { key: 'cancelled', label: `Annulées (${requests.filter(r => r.status === 'cancelled').length})` },
-        ].map((tab) => (
-          <button
-            key={tab.key}
-            onClick={() => setFilterStatus(tab.key)}
-            className={`px-4 py-2 rounded-xl text-xs font-bold transition whitespace-nowrap ${
-              filterStatus === tab.key
-                ? 'bg-indigo-600 text-white shadow-sm'
-                : 'bg-white border border-slate-200 text-slate-600 hover:bg-slate-50'
-            }`}
+          <Link
+            href="/services"
+            className="inline-flex items-center gap-2 px-5 py-2.5 rounded-2xl bg-primary hover:bg-primary-600 text-white text-xs font-bold shadow-xs transition shrink-0"
           >
-            {tab.label}
-          </button>
-        ))}
-      </div>
-
-      {/* Liste des demandes */}
-      {loading ? (
-        <div className="py-20 text-center text-slate-400 space-y-3">
-          <Loader2 className="w-8 h-8 animate-spin mx-auto text-indigo-600" />
-          <p className="text-sm font-medium">Chargement de vos demandes...</p>
+            <span>Explorer d'autres profils</span>
+            <span className="material-symbols-outlined text-sm">arrow_forward</span>
+          </Link>
         </div>
-      ) : filteredRequests.length === 0 ? (
-        <div className="bg-white rounded-3xl border border-slate-200 p-12 text-center max-w-md mx-auto space-y-4 shadow-sm">
-          <div className="w-14 h-14 rounded-2xl bg-indigo-50 text-indigo-600 flex items-center justify-center mx-auto">
-            <Calendar className="w-7 h-7" />
-          </div>
-          <h3 className="text-lg font-bold text-slate-900">Aucune demande trouvée</h3>
-          <p className="text-xs text-slate-500 leading-relaxed">
-            {filterStatus === 'all'
-              ? "Vous n'avez pas encore envoyé de demande de réservation sur TataWafa."
-              : `Aucune demande correspondant à ce statut.`}
-          </p>
-          <div>
-            <Link
-              href="/services"
-              className="inline-flex items-center gap-2 px-5 py-2.5 bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-bold rounded-xl shadow-md transition"
+
+        {/* Filtres de statut en pilules organiques */}
+        <div className="flex items-center gap-2 overflow-x-auto pb-1">
+          {[
+            { key: 'all', label: `Toutes (${requests.length})` },
+            { key: 'active', label: `En cours (${requests.filter(r => r.status === 'new' || r.status === 'in_progress').length})` },
+            { key: 'completed', label: `Terminées (${requests.filter(r => r.status === 'completed').length})` },
+            { key: 'cancelled', label: `Annulées (${requests.filter(r => r.status === 'cancelled').length})` },
+          ].map((tab) => (
+            <button
+              key={tab.key}
+              onClick={() => setFilterStatus(tab.key)}
+              className={`px-4 py-2 rounded-2xl text-xs font-bold transition whitespace-nowrap border ${
+                filterStatus === tab.key
+                  ? 'bg-primary text-white border-primary shadow-xs'
+                  : 'bg-surface-container-lowest border-[#ded7ca] text-on-surface-variant hover:text-on-surface'
+              }`}
             >
-              <span>Découvrir les prestataires à Alger</span>
-              <ArrowRight className="w-4 h-4" />
-            </Link>
-          </div>
+              {tab.label}
+            </button>
+          ))}
         </div>
-      ) : (
-        <div className="space-y-6">
-          {filteredRequests.map((req) => {
-            const badge = getStatusBadgeStyle(req.status);
-            const catBadge = req.listing ? getCategoryBadge(req.listing.category) : null;
-            const provider = req.listing?.provider;
 
-            return (
-              <div
-                key={req.id}
-                className="bg-white rounded-3xl border border-slate-200 p-6 shadow-sm space-y-5 hover:shadow-md transition"
+        {/* Liste des demandes */}
+        {loading ? (
+          <div className="py-20 text-center space-y-3">
+            <span className="material-symbols-outlined text-3xl text-primary animate-spin">
+              progress_activity
+            </span>
+            <p className="text-xs text-on-surface-variant">Chargement de vos dossiers...</p>
+          </div>
+        ) : filteredRequests.length === 0 ? (
+          <div className="bg-surface-container-lowest rounded-3xl border border-[#ded7ca] p-12 text-center max-w-md mx-auto space-y-4 shadow-sm">
+            <div className="w-14 h-14 rounded-2xl bg-primary-fixed/40 text-primary flex items-center justify-center mx-auto">
+              <span className="material-symbols-outlined text-2xl">calendar_month</span>
+            </div>
+            <h3 className="font-serif text-lg font-bold text-on-surface">Aucune demande trouvée</h3>
+            <p className="text-xs text-on-surface-variant leading-relaxed">
+              {filterStatus === 'all'
+                ? "Vous n'avez pas encore transmis de demande de garde sur TataWafa."
+                : `Aucune demande correspondant à ce filtre.`}
+            </p>
+            <div className="pt-2">
+              <Link
+                href="/services"
+                className="inline-flex items-center gap-2 px-5 py-2.5 bg-primary hover:bg-primary-600 text-white text-xs font-bold rounded-2xl shadow-xs transition"
               >
-                
-                {/* En-tête de la carte */}
-                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-slate-100 pb-4">
-                  <div className="flex items-center gap-3">
-                    <div className="w-12 h-12 rounded-2xl overflow-hidden bg-slate-100 border border-slate-200 shrink-0">
-                      {req.listing?.photo_url ? (
-                        <img src={req.listing.photo_url} alt="" className="w-full h-full object-cover" />
-                      ) : (
-                        <div className="w-full h-full flex items-center justify-center bg-indigo-50 text-indigo-600 font-bold text-xs">
-                          {catBadge?.shortLabel}
+                <span>Découvrir les prestataires certifiés</span>
+                <span className="material-symbols-outlined text-sm">arrow_forward</span>
+              </Link>
+            </div>
+          </div>
+        ) : (
+          <div className="space-y-6">
+            {filteredRequests.map((req) => {
+              const badge = getStatusBadgeStyle(req.status);
+              const catBadge = req.listing ? getCategoryBadge(req.listing.category) : null;
+              const provider = req.listing?.provider;
+              const dossierCode = `TW-ALG-${req.id.slice(-4).toUpperCase()}`;
+
+              return (
+                <div
+                  key={req.id}
+                  className="bg-surface-container-lowest rounded-3xl border border-[#ded7ca] p-6 shadow-sm space-y-5 hover:shadow-md transition"
+                >
+                  
+                  {/* En-tête de la carte */}
+                  <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-[#ded7ca]/60 pb-4">
+                    <div className="flex items-center gap-3">
+                      <div className="w-14 h-14 rounded-2xl overflow-hidden bg-[#f4f1ea] border border-[#ded7ca] shrink-0">
+                        {req.listing?.photo_url ? (
+                          <img src={req.listing.photo_url} alt="" className="w-full h-full object-cover" />
+                        ) : (
+                          <div className="w-full h-full flex items-center justify-center bg-primary-fixed/30 text-primary font-bold text-xs">
+                            {catBadge?.shortLabel || 'TW'}
+                          </div>
+                        )}
+                      </div>
+                      <div>
+                        <div className="flex items-center gap-2 flex-wrap">
+                          <span className="text-[10px] font-bold px-2.5 py-0.5 rounded-full bg-secondary-fixed text-on-secondary-fixed-variant">
+                            {catBadge?.label || 'Garde'}
+                          </span>
+                          <span className="text-xs font-bold text-[#7d562d] bg-[#fcf8ee] border border-[#D4A373]/60 px-2 py-0.5 rounded-full">
+                            Dossier {dossierCode}
+                          </span>
                         </div>
+                        <h3 className="font-serif text-base font-bold text-on-surface mt-1">
+                          {req.listing?.title || 'Prestation de garde à Alger'}
+                        </h3>
+                        <p className="text-xs text-on-surface-variant">
+                          Intervenante : <strong className="text-on-surface">{provider?.full_name || 'Assignée par le coordinateur'}</strong>
+                        </p>
+                      </div>
+                    </div>
+
+                    <div>
+                      <span className={`px-3 py-1 rounded-full text-xs font-bold border ${badge.bg}`}>
+                        {badge.label}
+                      </span>
+                    </div>
+                  </div>
+
+                  {/* Timeline de la demande */}
+                  <TimelineTracker status={req.status} />
+
+                  {/* Grille des détails */}
+                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 text-xs bg-[#FAF8F5] p-4 rounded-2xl border border-[#ded7ca]">
+                    <div>
+                      <span className="text-on-surface-variant text-[11px] block mb-0.5">Créneau d'intervention</span>
+                      <strong className="text-on-surface flex items-center gap-1">
+                        <span className="material-symbols-outlined text-primary text-sm">schedule</span>
+                        {formatDate(req.requested_datetime)}
+                      </strong>
+                    </div>
+
+                    <div>
+                      <span className="text-on-surface-variant text-[11px] block mb-0.5">Commune &amp; Quartier</span>
+                      <strong className="text-on-surface flex items-center gap-1">
+                        <span className="material-symbols-outlined text-on-surface-variant text-sm">location_on</span>
+                        {req.address_details || req.listing?.location || 'Alger'}
+                      </strong>
+                    </div>
+
+                    <div>
+                      <span className="text-on-surface-variant text-[11px] block mb-0.5">Règlement convenu</span>
+                      <strong className="text-secondary flex items-center gap-1">
+                        <span className="material-symbols-outlined text-secondary text-sm material-symbols-fill">payments</span>
+                        {req.listing?.price ? formatPrice(req.listing.price, req.listing.price_unit || 'séance') : 'Selon accord'} (Espèces)
+                      </strong>
+                    </div>
+                  </div>
+
+                  {/* Actions contextuelles */}
+                  <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pt-2">
+                    <Link
+                      href={`/confirmation/${req.id}`}
+                      className="text-xs font-bold text-primary hover:underline flex items-center gap-1"
+                    >
+                      <span>Consulter le bon de réservation complet</span>
+                      <span className="material-symbols-outlined text-base">arrow_forward</span>
+                    </Link>
+
+                    <div className="flex items-center gap-3">
+                      <a
+                        href={`tel:${ADMIN_CONTACT.phone}`}
+                        className="text-xs font-bold text-on-surface-variant hover:text-secondary flex items-center gap-1"
+                      >
+                        <span className="material-symbols-outlined text-sm">call</span>
+                        <span>Contacter Coordinateur</span>
+                      </a>
+
+                      {req.status === 'completed' && (
+                        req.review ? (
+                          <div className="flex items-center gap-1.5 text-xs text-secondary bg-secondary-fixed/50 px-3 py-1.5 rounded-xl border border-secondary/30">
+                            <span className="material-symbols-outlined text-sm material-symbols-fill">task_alt</span>
+                            <span>Avis publié ({req.review.rating}/5)</span>
+                          </div>
+                        ) : (
+                          <button
+                            type="button"
+                            onClick={() => setSelectedReviewRequest(req)}
+                            className="px-4 py-2 bg-wax-gold hover:bg-[#b7895b] text-white text-xs font-bold rounded-2xl shadow-xs transition flex items-center gap-1.5"
+                          >
+                            <span className="material-symbols-outlined text-sm material-symbols-fill">star</span>
+                            <span>Laisser un avis certifié</span>
+                          </button>
+                        )
                       )}
                     </div>
-                    <div>
-                      <div className="flex items-center gap-2">
-                        <span className={`text-[10px] font-bold px-2 py-0.5 rounded border ${catBadge?.badgeClass}`}>
-                          {catBadge?.label}
-                        </span>
-                        <span className="text-xs text-slate-400">Dossier #{req.id.slice(-6).toUpperCase()}</span>
-                      </div>
-                      <h3 className="text-base font-bold text-slate-900 mt-0.5">
-                        {req.listing?.title || 'Annonce de service'}
-                      </h3>
-                      <p className="text-xs text-slate-600">
-                        Prestataire : <strong>{provider?.full_name || 'Prestataire désigné'}</strong>
-                      </p>
-                    </div>
                   </div>
 
-                  <div>
-                    <span className={`px-3 py-1 rounded-full text-xs font-bold border ${badge.bg}`}>
-                      {badge.label}
-                    </span>
-                  </div>
                 </div>
+              );
+            })}
+          </div>
+        )}
 
-                {/* Timeline de la demande */}
-                <TimelineTracker status={req.status} />
+        {/* Modal d'Avis */}
+        {selectedReviewRequest && (
+          <ReviewModal
+            request={selectedReviewRequest}
+            isOpen={Boolean(selectedReviewRequest)}
+            onClose={() => setSelectedReviewRequest(null)}
+            onReviewSubmitted={() => {
+              loadRequests();
+            }}
+          />
+        )}
 
-                {/* Grille des détails de l'intervention */}
-                <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 text-xs bg-slate-50 p-4 rounded-2xl border border-slate-100">
-                  <div>
-                    <span className="text-slate-400 block mb-0.5">Créneau demandé</span>
-                    <strong className="text-slate-900 flex items-center gap-1">
-                      <Clock className="w-3.5 h-3.5 text-indigo-600" />
-                      {formatDate(req.requested_datetime)}
-                    </strong>
-                  </div>
-
-                  <div>
-                    <span className="text-slate-400 block mb-0.5">Lieu d'intervention</span>
-                    <strong className="text-slate-900 flex items-center gap-1">
-                      <MapPin className="w-3.5 h-3.5 text-slate-400" />
-                      {req.address_details || req.listing?.location} (Alger)
-                    </strong>
-                  </div>
-
-                  <div>
-                    <span className="text-slate-400 block mb-0.5">Tarif convenu</span>
-                    <strong className="text-slate-900">
-                      {req.listing?.price ? formatPrice(req.listing.price, req.listing.price_unit || 'séance') : 'Sur devis'} (Espèces)
-                    </strong>
-                  </div>
-                </div>
-
-                {/* Actions contextuelles */}
-                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pt-2">
-                  <Link
-                    href={`/confirmation/${req.id}`}
-                    className="text-xs font-bold text-indigo-600 hover:underline flex items-center gap-1"
-                  >
-                    <span>Voir le récapitulatif du dossier</span>
-                    <ChevronRight className="w-3.5 h-3.5" />
-                  </Link>
-
-                  {req.status === 'completed' && (
-                    req.review ? (
-                      <div className="flex items-center gap-2 text-xs text-emerald-800 bg-emerald-50 px-3 py-1.5 rounded-xl border border-emerald-200">
-                        <CheckCircle2 className="w-4 h-4 text-emerald-600" />
-                        <span>Avis publié ({req.review.rating}/5)</span>
-                      </div>
-                    ) : (
-                      <button
-                        type="button"
-                        onClick={() => setSelectedReviewRequest(req)}
-                        className="px-4 py-2 bg-amber-500 hover:bg-amber-600 text-white text-xs font-bold rounded-xl shadow-sm transition flex items-center gap-1.5"
-                      >
-                        <Star className="w-3.5 h-3.5 fill-white" />
-                        <span>Laisser un avis client certifié</span>
-                      </button>
-                    )
-                  )}
-                </div>
-
-              </div>
-            );
-          })}
-        </div>
-      )}
-
-      {/* Modal d'Avis */}
-      {selectedReviewRequest && (
-        <ReviewModal
-          request={selectedReviewRequest}
-          isOpen={Boolean(selectedReviewRequest)}
-          onClose={() => setSelectedReviewRequest(null)}
-          onReviewSubmitted={() => {
-            loadRequests();
-          }}
-        />
-      )}
-
+      </div>
     </div>
   );
 }
