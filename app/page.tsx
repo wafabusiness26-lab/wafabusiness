@@ -2,412 +2,766 @@
 
 import React, { useState, useEffect } from 'react';
 import Link from 'next/link';
+import { useRouter } from 'next/navigation';
 import { ServiceListing } from '@/types';
 import { DataStore } from '@/lib/store';
-import { ServiceCard } from '@/components/ServiceCard';
-import { VerificationBadge } from '@/components/VerificationBadge';
-import { AdminCallCard } from '@/components/AdminCallCard';
-import { ALGER_COMMUNES, CATEGORIES_CONFIG, SAFETY_PILLARS, FAQ_ITEMS, ADMIN_CONTACT } from '@/lib/constants';
-import { 
-  Baby, 
-  GraduationCap, 
-  Search, 
-  MapPin, 
-  ShieldCheck, 
-  PhoneCall, 
-  CheckCircle2, 
-  ArrowRight, 
-  Coins, 
-  Star, 
-  HeartHandshake,
-  UserCheck2,
-  HelpCircle,
-  Clock,
-  Sparkles,
-  ChevronDown
-} from 'lucide-react';
+import { ALGER_COMMUNES, ADMIN_CONTACT } from '@/lib/constants';
+
+// Featured backup profiles if store has empty listings
+const FEATURED_PROFILES = [
+  {
+    id: 'amina-k-hydra',
+    name: 'Tata Amina K.',
+    role: 'Assistante Maternelle & Nounou',
+    commune: 'Hydra',
+    experience: '7 ans d\'expérience',
+    photo: 'https://images.unsplash.com/photo-1544005313-94ddf0286df2?auto=format&fit=crop&w=400&q=80',
+    skills: ['Diplôme Petite Enfance', 'Secourisme Pédiatrique', 'Éveil Montessori'],
+    price: '1 200 DA',
+    priceUnit: '/ h',
+    reviewsCount: 19,
+    rating: 5.0,
+    badgeText: 'Contrôlée au bureau d\'Alger'
+  },
+  {
+    id: 'karima-b-kouba',
+    name: 'Professeure Karima B.',
+    role: 'Enseignante Primaire & CEM',
+    commune: 'Kouba',
+    experience: '11 ans d\'expérience',
+    photo: 'https://images.unsplash.com/photo-1573496359142-b8d87734a5a2?auto=format&fit=crop&w=400&q=80',
+    skills: ['Licence Mathématiques', 'Préparation BEM', 'Pédagogie Positive'],
+    price: '1 800 DA',
+    priceUnit: '/ séance',
+    reviewsCount: 24,
+    rating: 4.9,
+    badgeText: 'Diplômes & CNI vérifiés'
+  },
+  {
+    id: 'samia-t-cheraga',
+    name: 'Tata Samia T.',
+    role: 'Garde Périscolaire & Éveil',
+    commune: 'Chéraga',
+    experience: '5 ans d\'expérience',
+    photo: 'https://images.unsplash.com/photo-1580489944761-15a19d654956?auto=format&fit=crop&w=400&q=80',
+    skills: ['Ancienne Aide-Maternelle', 'Aide aux devoirs', 'Rythme du sommeil'],
+    price: '28 000 DA',
+    priceUnit: '/ mois',
+    reviewsCount: 14,
+    rating: 5.0,
+    badgeText: 'Entretien physique validé'
+  }
+];
 
 export default function HomePage() {
+  const router = useRouter();
+  const [activeTab, setActiveTab] = useState<'babysitting' | 'teaching'>('babysitting');
+  const [selectedCommune, setSelectedCommune] = useState('Hydra');
+  const [selectedAge, setSelectedAge] = useState('0-3ans');
   const [listings, setListings] = useState<ServiceListing[]>([]);
-  const [selectedCommune, setSelectedCommune] = useState<string>('all');
-  const [selectedCategory, setSelectedCategory] = useState<string>('all');
-  const [searchQuery, setSearchQuery] = useState('');
-  const [openFaqIndex, setOpenFaqIndex] = useState<number | null>(0);
   const [loading, setLoading] = useState(true);
-
-  const fetchListings = async () => {
-    setLoading(true);
-    try {
-      const data = await DataStore.getListings({
-        category: selectedCategory !== 'all' ? selectedCategory : undefined,
-        commune: selectedCommune !== 'all' ? selectedCommune : undefined,
-        query: searchQuery || undefined,
-      });
-      setListings(data);
-    } catch (err) {
-      console.error(err);
-    } finally {
-      setLoading(false);
-    }
-  };
+  const [openFaq, setOpenFaq] = useState<number | null>(0);
+  const [showWhatsAppModal, setShowWhatsAppModal] = useState(false);
+  const [whatsAppText, setWhatsAppText] = useState('Bonjour, je recherche une nounou vérifiée sur Alger pour mes enfants.');
 
   useEffect(() => {
-    fetchListings();
+    async function loadData() {
+      try {
+        const data = await DataStore.getListings();
+        // Strict hand-to-hand verification rule: only verified providers can appear
+        const verified = data.filter(item => item.provider?.verification_status === "verifie_en_main_propre" || item.provider?.id_card_verified);
+        setListings(verified);
+      } catch (err) {
+        console.error(err);
+      } finally {
+        setLoading(false);
+      }
+    }
+    loadData();
+  }, []);
 
-    const handleDataChange = () => {
-      fetchListings();
-    };
+  const handleSearch = (e: React.FormEvent) => {
+    e.preventDefault();
+    router.push(`/services?category=${activeTab}&commune=${encodeURIComponent(selectedCommune)}`);
+  };
 
-    window.addEventListener('sm_data_change', handleDataChange);
-    return () => window.removeEventListener('sm_data_change', handleDataChange);
-  }, [selectedCommune, selectedCategory]);
+  const openWhatsAppDirect = () => {
+    const cleanPhone = ADMIN_CONTACT.whatsapp.replace(/[^0-9]/g, '');
+    const url = `https://wa.me/${cleanPhone}?text=${encodeURIComponent(whatsAppText)}`;
+    window.open(url, '_blank');
+    setShowWhatsAppModal(false);
+  };
 
   return (
-    <div className="space-y-16 sm:space-y-24">
+    <div className="flex flex-col w-full min-h-screen bg-[#FAF8F5]">
       
-      {/* SECTION 1: HERO AVEC RECHERCHE PAR COMMUNE */}
-      <section className="relative overflow-hidden bg-gradient-to-b from-indigo-50/70 via-white to-slate-50 pt-12 pb-16 sm:pt-20 sm:pb-28 border-b border-slate-200/70">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 relative">
+      {/* 1. HERO SECTION (Editorial Alabaster, Terracotta & Eucalyptus) */}
+      <section className="relative overflow-hidden pt-12 pb-20 md:pt-18 md:pb-28">
+        {/* Atmospheric Ambient Glows */}
+        <div className="absolute top-0 left-1/2 -translate-x-1/2 w-full max-w-7xl h-[450px] pointer-events-none overflow-hidden -z-10">
+          <div className="absolute top-[-20%] left-[-10%] w-[50%] h-[100%] rounded-full bg-primary-fixed/20 blur-[120px]"></div>
+          <div className="absolute top-[10%] right-[-5%] w-[45%] h-[90%] rounded-full bg-secondary-fixed/25 blur-[100px]"></div>
+        </div>
+
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 text-center">
           
-          <div className="text-center max-w-3xl mx-auto space-y-5">
+          {/* Top Micro Badge */}
+          <div className="inline-flex items-center gap-2 px-4 py-1.5 rounded-full bg-surface-container-lowest shadow-sm border border-outline-variant/40 mb-6">
+            <span className="material-symbols-outlined text-primary text-base material-symbols-fill">verified_user</span>
+            <span className="text-[11px] font-bold text-on-surface-variant uppercase tracking-widest">
+              Plateforme Éthique &amp; Hyper-Locale • Wilaya d'Alger
+            </span>
+          </div>
+
+          {/* Editorial Headline */}
+          <h1 className="font-serif text-3xl sm:text-5xl lg:text-6xl text-on-surface font-normal tracking-tight mb-6 max-w-4xl mx-auto leading-[1.15]">
+            Confiez vos enfants à des mains chaleureuses, <span className="italic font-serif text-primary">vérifiées en personne</span> à Alger.
+          </h1>
+
+          <p className="text-[16px] sm:text-[18px] text-on-surface-variant max-w-2xl mx-auto mb-10 leading-relaxed font-normal">
+            Babysitting bienveillant et soutien scolaire d'excellence. Rencontres en personne au bureau, contrôle rigoureux des pièces d'identité et diplômes, coordination téléphonique directe.
+          </p>
+
+          {/* Hyper-Local Search Bento Box */}
+          <div className="max-w-3xl mx-auto bg-surface-container-lowest/90 backdrop-blur-xl rounded-3xl p-4 sm:p-6 shadow-[0_8px_30px_rgba(43,58,74,0.06)] border border-outline-variant/30 text-left">
             
-            {/* Badge de confiance Algérie */}
-            <div className="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-full bg-white shadow-sm border border-emerald-200 text-xs font-bold text-emerald-800">
-              <ShieldCheck className="w-4 h-4 text-emerald-600 shrink-0" />
-              <span>Nounous & Enseignants vérifiés en main propre • 57 Communes d'Alger</span>
+            {/* Type Selector Tabs */}
+            <div className="flex items-center gap-2 p-1.5 bg-[#ede8df] rounded-2xl w-fit mb-6 border border-[#e4dec7]">
+              <button
+                type="button"
+                onClick={() => setActiveTab('babysitting')}
+                className={`flex items-center gap-2 px-5 py-2.5 rounded-xl text-xs sm:text-sm font-semibold transition-all ${
+                  activeTab === 'babysitting'
+                    ? 'bg-primary text-white shadow-sm'
+                    : 'text-on-surface-variant hover:text-on-surface'
+                }`}
+              >
+                <span className="material-symbols-outlined text-base">family_restroom</span>
+                <span>Garde d'Enfants &amp; Nounous</span>
+              </button>
+              
+              <button
+                type="button"
+                onClick={() => setActiveTab('teaching')}
+                className={`flex items-center gap-2 px-5 py-2.5 rounded-xl text-xs sm:text-sm font-semibold transition-all ${
+                  activeTab === 'teaching'
+                    ? 'bg-primary text-white shadow-sm'
+                    : 'text-on-surface-variant hover:text-on-surface'
+                }`}
+              >
+                <span className="material-symbols-outlined text-base">school</span>
+                <span>Soutien Scolaire à Domicile</span>
+              </button>
             </div>
 
-            {/* Titre Principal */}
-            <h1 className="text-3xl sm:text-5xl font-black text-slate-900 tracking-tight leading-tight">
-              Trouvez une Nounou de Confiance ou un Enseignant Particulier à Alger
-            </h1>
-
-            <p className="text-sm sm:text-base text-slate-600 max-w-2xl mx-auto leading-relaxed">
-              La plateforme sécurisée qui met en relation les familles d'Alger avec des prestataires soigneusement contrôlés. Coordination humaine par téléphone et règlement direct en espèces (DA).
-            </p>
-
-            {/* Barre de Recherche Multi-Critères */}
-            <div className="pt-4 max-w-3xl mx-auto">
-              <div className="bg-white p-2.5 sm:p-3 rounded-2xl shadow-xl border border-slate-200 flex flex-col sm:flex-row items-center gap-2.5">
-                
-                {/* Catégorie */}
-                <div className="flex items-center gap-2 px-3 py-2 w-full sm:w-1/3 border-b sm:border-b-0 sm:border-r border-slate-100">
-                  <Baby className="w-4 h-4 text-indigo-600 shrink-0" />
-                  <select
-                    value={selectedCategory}
-                    onChange={(e) => setSelectedCategory(e.target.value)}
-                    className="w-full text-xs sm:text-sm bg-transparent outline-none text-slate-800 font-medium cursor-pointer"
-                  >
-                    <option value="all">Tous les services</option>
-                    <option value="babysitting">Garde d'enfants (Babysitting)</option>
-                    <option value="teaching">Cours & Soutien scolaire</option>
-                  </select>
-                </div>
-
-                {/* Commune d'Alger */}
-                <div className="flex items-center gap-2 px-3 py-2 w-full sm:w-1/3 border-b sm:border-b-0 sm:border-r border-slate-100">
-                  <MapPin className="w-4 h-4 text-rose-500 shrink-0" />
+            {/* Form Filters Grid */}
+            <form onSubmit={handleSearch} className="grid grid-cols-1 md:grid-cols-12 gap-3 items-end">
+              
+              {/* Commune Select Input */}
+              <div className="md:col-span-6 space-y-1.5">
+                <label className="text-[11px] font-bold text-on-surface uppercase tracking-wider block">
+                  Commune d'Alger (57 communes)
+                </label>
+                <div className="relative">
+                  <span className="material-symbols-outlined absolute left-3.5 top-1/2 -translate-y-1/2 text-primary text-lg pointer-events-none">
+                    location_on
+                  </span>
                   <select
                     value={selectedCommune}
                     onChange={(e) => setSelectedCommune(e.target.value)}
-                    className="w-full text-xs sm:text-sm bg-transparent outline-none text-slate-800 font-medium cursor-pointer"
+                    className="w-full bg-[#FAF8F5] border border-[#ded7ca] rounded-2xl pl-10 pr-8 py-3 text-sm text-on-surface font-semibold focus:outline-none focus:ring-2 focus:ring-primary/20 appearance-none cursor-pointer"
                   >
-                    <option value="all">Toutes les 57 communes d'Alger</option>
-                    {ALGER_COMMUNES.map((c) => (
-                      <option key={c} value={c}>
-                        {c}
+                    {ALGER_COMMUNES.map((commune) => (
+                      <option key={commune} value={commune}>
+                        {commune} (Wilaya d'Alger)
                       </option>
                     ))}
                   </select>
+                  <span className="material-symbols-outlined absolute right-3 top-1/2 -translate-y-1/2 text-on-surface-variant text-base pointer-events-none">
+                    expand_more
+                  </span>
                 </div>
+              </div>
 
-                {/* Mot-clé */}
-                <div className="flex items-center gap-2 px-3 py-2 w-full sm:w-1/3">
-                  <Search className="w-4 h-4 text-slate-400 shrink-0" />
-                  <input
-                    type="text"
-                    placeholder="Matière, niveau, mot-clé..."
-                    value={searchQuery}
-                    onChange={(e) => setSearchQuery(e.target.value)}
-                    onKeyDown={(e) => e.key === 'Enter' && fetchListings()}
-                    className="w-full text-xs sm:text-sm bg-transparent outline-none text-slate-800 placeholder-slate-400"
-                  />
+              {/* Age / Level Range */}
+              <div className="md:col-span-3 space-y-1.5">
+                <label className="text-[11px] font-bold text-on-surface uppercase tracking-wider block">
+                  {activeTab === 'babysitting' ? 'Âge des Enfants' : 'Niveau Scolaire'}
+                </label>
+                <div className="relative">
+                  <select
+                    value={selectedAge}
+                    onChange={(e) => setSelectedAge(e.target.value)}
+                    className="w-full bg-[#FAF8F5] border border-[#ded7ca] rounded-2xl px-3.5 py-3 text-sm text-on-surface font-semibold focus:outline-none focus:ring-2 focus:ring-primary/20 appearance-none cursor-pointer"
+                  >
+                    {activeTab === 'babysitting' ? (
+                      <>
+                        <option value="0-3ans">Nourrisson (0-3 ans)</option>
+                        <option value="3-6ans">Petite Enfance (3-6 ans)</option>
+                        <option value="6-10ans">Périscolaire (6-10 ans)</option>
+                        <option value="plus-10ans">+10 ans</option>
+                      </>
+                    ) : (
+                      <>
+                        <option value="primaire">Primaire (1AP - 5AP)</option>
+                        <option value="cem">Moyen / BEM</option>
+                        <option value="lycee">Secondaire / BAC</option>
+                        <option value="langues">Langues (Français / Anglais)</option>
+                      </>
+                    )}
+                  </select>
+                  <span className="material-symbols-outlined absolute right-3 top-1/2 -translate-y-1/2 text-on-surface-variant text-base pointer-events-none">
+                    expand_more
+                  </span>
                 </div>
+              </div>
 
-                {/* Bouton Filtrer */}
+              {/* Search CTA */}
+              <div className="md:col-span-3">
                 <button
-                  type="button"
-                  onClick={fetchListings}
-                  className="w-full sm:w-auto px-6 py-3 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white text-xs sm:text-sm font-bold shadow-md shadow-indigo-200 transition whitespace-nowrap flex items-center justify-center gap-1.5"
+                  type="submit"
+                  className="w-full bg-primary hover:bg-primary-600 text-white font-bold py-3.5 px-4 rounded-2xl shadow-sm hover:shadow-md transition-all flex items-center justify-center gap-2 cursor-pointer"
                 >
-                  <Search className="w-4 h-4" />
-                  <span>Rechercher</span>
+                  <span className="material-symbols-outlined text-lg">search</span>
+                  <span className="text-sm">Rechercher</span>
                 </button>
+              </div>
+            </form>
 
-              </div>
-            </div>
-
-            {/* Statistiques clés de confiance */}
-            <div className="pt-6 grid grid-cols-2 sm:grid-cols-4 gap-3 max-w-2xl mx-auto text-left">
-              <div className="bg-white/80 p-3 rounded-xl border border-slate-200/80">
-                <span className="text-indigo-600 font-black text-lg block">57</span>
-                <span className="text-[11px] text-slate-500 font-medium">Communes d'Alger couvertes</span>
-              </div>
-              <div className="bg-white/80 p-3 rounded-xl border border-slate-200/80">
-                <span className="text-emerald-600 font-black text-lg block">100%</span>
-                <span className="text-[11px] text-slate-500 font-medium">Vérification en main propre</span>
-              </div>
-              <div className="bg-white/80 p-3 rounded-xl border border-slate-200/80">
-                <span className="text-amber-600 font-black text-lg block">DA</span>
-                <span className="text-[11px] text-slate-500 font-medium">Tarifs clairs en espèces</span>
-              </div>
-              <div className="bg-white/80 p-3 rounded-xl border border-slate-200/80">
-                <span className="text-indigo-600 font-black text-lg block">7j/7</span>
-                <span className="text-[11px] text-slate-500 font-medium">Coordination téléphonique</span>
-              </div>
+            {/* Quick Commune Badges */}
+            <div className="pt-5 border-t border-[#ded7ca]/60 mt-5 flex flex-wrap items-center gap-2">
+              <span className="text-[11px] text-on-surface-variant font-medium">Communes très demandées :</span>
+              {['Hydra', 'El Biar', 'Kouba', 'Chéraga', 'Dely Ibrahim', 'Rouiba'].map((com) => (
+                <button
+                  key={com}
+                  type="button"
+                  onClick={() => setSelectedCommune(com)}
+                  className={`text-[11px] px-2.5 py-1 rounded-full font-semibold border transition ${
+                    selectedCommune === com
+                      ? 'bg-primary text-white border-primary'
+                      : 'bg-white text-on-surface-variant border-[#ded7ca] hover:border-primary'
+                  }`}
+                >
+                  {com}
+                </button>
+              ))}
             </div>
 
           </div>
 
-        </div>
-      </section>
-
-      {/* SECTION 2: DEUX CATÉGORIES PRINCIPALES */}
-      <section className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-        <div className="text-center max-w-2xl mx-auto mb-10 space-y-2">
-          <span className="text-xs font-bold uppercase tracking-wider text-indigo-600 bg-indigo-50 px-3 py-1 rounded-full">
-            Nos Métiers de Cœur
-          </span>
-          <h2 className="text-2xl sm:text-3xl font-extrabold text-slate-900">
-            Deux services essentiels pour la sérénité des familles
-          </h2>
-          <p className="text-xs sm:text-sm text-slate-500">
-            Choisissez la spécialité qui correspond aux besoins de vos enfants à Alger.
-          </p>
-        </div>
-
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-          
-          {/* Carte Babysitting */}
-          <div className="bg-gradient-to-br from-indigo-50/70 to-white rounded-3xl border border-indigo-100 p-6 sm:p-8 shadow-sm flex flex-col justify-between space-y-6">
-            <div className="space-y-4">
-              <div className="w-12 h-12 rounded-2xl bg-indigo-600 text-white flex items-center justify-center shadow-md shadow-indigo-200">
-                <Baby className="w-6 h-6" />
-              </div>
-              <div>
-                <h3 className="text-xl font-bold text-slate-900">Garde d'Enfants & Nounous</h3>
-                <p className="text-xs sm:text-sm text-slate-600 mt-1 leading-relaxed">
-                  Confiez vos tout-petits et vos enfants scolarisés à des personnes fiables, ponctuelles et expérimentées.
-                </p>
-              </div>
-
-              <ul className="space-y-2 text-xs text-slate-700">
-                {CATEGORIES_CONFIG.babysitting.subcategories.map((sub, i) => (
-                  <li key={i} className="flex items-center gap-2">
-                    <CheckCircle2 className="w-3.5 h-3.5 text-indigo-600 shrink-0" />
-                    <span>{sub}</span>
-                  </li>
-                ))}
-              </ul>
+          {/* Reassurance Indicators Strip */}
+          <div className="mt-8 flex flex-wrap justify-center items-center gap-6 sm:gap-10 text-on-surface-variant text-xs font-semibold">
+            <div className="flex items-center gap-2">
+              <span className="material-symbols-outlined text-secondary text-lg material-symbols-fill">shield_with_heart</span>
+              <span>100% Vérifié en Main Propre</span>
             </div>
-
-            <div className="pt-4 border-t border-indigo-100 flex items-center justify-between">
-              <span className="text-xs font-bold text-indigo-900">À partir de 1 500 DA / Séance</span>
-              <Link
-                href="/services?category=babysitting"
-                className="inline-flex items-center gap-1 text-xs font-bold text-indigo-600 hover:text-indigo-800 transition"
-              >
-                <span>Voir les nounous</span>
-                <ArrowRight className="w-3.5 h-3.5" />
-              </Link>
+            <div className="flex items-center gap-2">
+              <span className="material-symbols-outlined text-tertiary text-lg material-symbols-fill">cloud_off</span>
+              <span>Zéro Document sur Internet</span>
             </div>
-          </div>
-
-          {/* Carte Soutien Scolaire */}
-          <div className="bg-gradient-to-br from-emerald-50/70 to-white rounded-3xl border border-emerald-100 p-6 sm:p-8 shadow-sm flex flex-col justify-between space-y-6">
-            <div className="space-y-4">
-              <div className="w-12 h-12 rounded-2xl bg-emerald-600 text-white flex items-center justify-center shadow-md shadow-emerald-200">
-                <GraduationCap className="w-6 h-6" />
-              </div>
-              <div>
-                <h3 className="text-xl font-bold text-slate-900">Cours Particuliers & Soutien Scolaire</h3>
-                <p className="text-xs sm:text-sm text-slate-600 mt-1 leading-relaxed">
-                  Accompagnement bienveillant pour la réussite scolaire au Primaire, CEM (BEM) et Lycée (BAC).
-                </p>
-              </div>
-
-              <ul className="space-y-2 text-xs text-slate-700">
-                {CATEGORIES_CONFIG.teaching.subcategories.map((sub, i) => (
-                  <li key={i} className="flex items-center gap-2">
-                    <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600 shrink-0" />
-                    <span>{sub}</span>
-                  </li>
-                ))}
-              </ul>
+            <div className="flex items-center gap-2">
+              <span className="material-symbols-outlined text-primary text-lg material-symbols-fill">payments</span>
+              <span>0 DA en ligne • 100% Espèces</span>
             </div>
-
-            <div className="pt-4 border-t border-emerald-100 flex items-center justify-between">
-              <span className="text-xs font-bold text-emerald-900">À partir de 1 500 DA / Séance</span>
-              <Link
-                href="/services?category=teaching"
-                className="inline-flex items-center gap-1 text-xs font-bold text-emerald-600 hover:text-emerald-800 transition"
-              >
-                <span>Voir les enseignants</span>
-                <ArrowRight className="w-3.5 h-3.5" />
-              </Link>
+            <div className="flex items-center gap-2">
+              <span className="material-symbols-outlined text-secondary text-lg">call</span>
+              <span>Coordination Humaine 7j/7</span>
             </div>
           </div>
 
         </div>
       </section>
 
-      {/* SECTION 3: DERNIÈRES ANNONCES DISPONIBLES */}
-      <section className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-8">
-          <div>
-            <h2 className="text-2xl font-bold text-slate-900 tracking-tight">Prestataires Disponibles à Alger</h2>
-            <p className="text-xs sm:text-sm text-slate-500 mt-0.5">
-              Consultez les annonces enregistrées et réservez en quelques clics.
-            </p>
-          </div>
-
-          <Link
-            href="/services"
-            className="inline-flex items-center gap-1 text-xs font-bold text-indigo-600 hover:text-indigo-800 transition"
-          >
-            <span>Explorer tout le catalogue ({listings.length})</span>
-            <ArrowRight className="w-3.5 h-3.5" />
-          </Link>
-        </div>
-
-        {loading ? (
-          <div className="py-16 text-center text-slate-400">
-            <span className="text-sm font-medium">Chargement des annonces...</span>
-          </div>
-        ) : listings.length === 0 ? (
-          <div className="bg-white rounded-3xl border border-slate-200 p-10 text-center max-w-lg mx-auto space-y-4 shadow-sm">
-            <div className="w-12 h-12 rounded-2xl bg-indigo-50 text-indigo-600 flex items-center justify-center mx-auto">
-              <Sparkles className="w-6 h-6" />
-            </div>
-            <h3 className="text-lg font-bold text-slate-900">Aucune annonce publiée pour le moment</h3>
-            <p className="text-xs text-slate-500 leading-relaxed">
-              La plateforme démarre à zéro ! Vous êtes nounou ou enseignant à Alger ? Publiez la première annonce et soyez visible par les familles de votre quartier.
-            </p>
-            <div>
-              <Link
-                href="/provider/annonces"
-                className="inline-flex items-center gap-2 px-5 py-2.5 bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-bold rounded-xl shadow-md transition"
-              >
-                <span>Publier une annonce de service</span>
-                <ArrowRight className="w-4 h-4" />
-              </Link>
-            </div>
-          </div>
-        ) : (
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
-            {listings.slice(0, 8).map((listing) => (
-              <ServiceCard key={listing.id} listing={listing} />
-            ))}
-          </div>
-        )}
-      </section>
-
-      {/* SECTION 4: CHARTE DE CONFIANCE & SÉCURITÉ EN MAIN PROPRE */}
-      <section className="bg-gradient-to-r from-slate-900 via-indigo-950 to-slate-900 text-white py-16">
+      {/* 2. THE 4 GOLDEN PILLARS OF TRUST (CHARTE TATAWAFA) */}
+      <section className="py-16 md:py-24 bg-[#ede8df]/50 border-y border-[#e4dec7]">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           
-          <div className="text-center max-w-2xl mx-auto mb-12 space-y-3">
-            <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-emerald-500/20 text-emerald-300 text-xs font-bold border border-emerald-500/30">
-              <ShieldCheck className="w-4 h-4 text-emerald-400" />
-              <span>Notre Protocole de Confiance</span>
-            </div>
-            <h2 className="text-2xl sm:text-3xl font-extrabold tracking-tight">
-              Pourquoi TataWafa est la solution la plus sûre à Alger
+          <div className="text-center max-w-3xl mx-auto mb-14 space-y-3">
+            <span className="text-[11px] font-bold uppercase tracking-widest text-primary block">
+              Charte de Sérénité Familiale
+            </span>
+            <h2 className="font-serif text-2xl sm:text-4xl text-on-surface font-semibold tracking-tight">
+              Les 4 Piliers Inviolables de la Confiance TataWafa
             </h2>
-            <p className="text-xs sm:text-sm text-slate-300">
-              La sécurité de vos enfants passe avant le digital. Aucun document d'identité n'est exposé en ligne.
+            <p className="text-sm sm:text-base text-on-surface-variant leading-relaxed">
+              Une sécurité absolue pensée pour la tranquillité des foyers algérois, sans intermédiaire opaque.
             </p>
           </div>
 
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
-            {SAFETY_PILLARS.map((p, idx) => (
-              <div key={idx} className="bg-white/5 border border-white/10 rounded-2xl p-6 backdrop-blur-sm space-y-3">
-                <div className="w-10 h-10 rounded-xl bg-indigo-600/30 text-indigo-300 flex items-center justify-center font-bold text-base border border-indigo-500/30">
-                  {idx + 1}
-                </div>
-                <h4 className="font-bold text-sm text-white">{p.title}</h4>
-                <p className="text-xs text-slate-300 leading-relaxed">{p.desc}</p>
+          {/* Bento Grid for 4 Pillars */}
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+            
+            {/* Pillar 1 */}
+            <div className="bg-surface-container-lowest p-6 rounded-3xl shadow-sm border border-[#ded7ca] hover:shadow-md transition">
+              <div className="w-12 h-12 rounded-2xl bg-primary-fixed text-primary flex items-center justify-center mb-5">
+                <span className="material-symbols-outlined text-2xl material-symbols-fill">how_to_reg</span>
               </div>
-            ))}
+              <h3 className="font-serif text-lg font-bold text-on-surface mb-2">
+                100% Vérification en Main Propre
+              </h3>
+              <p className="text-xs text-on-surface-variant leading-relaxed">
+                Chaque nounou et tuteur est rencontré en personne au bureau d'Alger. CNI, casier judiciaire et diplômes originaux sont méticuleusement contrôlés.
+              </p>
+            </div>
+
+            {/* Pillar 2 */}
+            <div className="bg-surface-container-lowest p-6 rounded-3xl shadow-sm border border-[#ded7ca] hover:shadow-md transition">
+              <div className="w-12 h-12 rounded-2xl bg-secondary-fixed text-secondary flex items-center justify-center mb-5">
+                <span className="material-symbols-outlined text-2xl material-symbols-fill">lock</span>
+              </div>
+              <h3 className="font-serif text-lg font-bold text-on-surface mb-2">
+                Zéro Document sur Internet
+              </h3>
+              <p className="text-xs text-on-surface-variant leading-relaxed">
+                Aucune pièce d'identité ni diplôme n'est stocké sur le cloud. Vos données et celles des intervenants restent strictement confidentielles et protégées.
+              </p>
+            </div>
+
+            {/* Pillar 3 */}
+            <div className="bg-surface-container-lowest p-6 rounded-3xl shadow-sm border border-[#ded7ca] hover:shadow-md transition">
+              <div className="w-12 h-12 rounded-2xl bg-tertiary-fixed text-tertiary flex items-center justify-center mb-5">
+                <span className="material-symbols-outlined text-2xl material-symbols-fill">price_check</span>
+              </div>
+              <h3 className="font-serif text-lg font-bold text-on-surface mb-2">
+                Tarification Transparente (DA)
+              </h3>
+              <p className="text-xs text-on-surface-variant leading-relaxed">
+                Tarifs clairs en Dinars Algériens (à l'heure, à la séance ou au mois). Zéro commission surprise, tout est convenu dès le départ.
+              </p>
+            </div>
+
+            {/* Pillar 4 */}
+            <div className="bg-surface-container-lowest p-6 rounded-3xl shadow-sm border border-[#ded7ca] hover:shadow-md transition">
+              <div className="w-12 h-12 rounded-2xl bg-secondary-container text-on-secondary-container flex items-center justify-center mb-5">
+                <span className="material-symbols-outlined text-2xl material-symbols-fill">handshake</span>
+              </div>
+              <h3 className="font-serif text-lg font-bold text-on-surface mb-2">
+                Espèces &amp; Contact Direct
+              </h3>
+              <p className="text-xs text-on-surface-variant leading-relaxed">
+                Pas besoin de carte bancaire : règlement direct de main à main. Le coordinateur vous accompagne par téléphone à chaque étape.
+              </p>
+            </div>
+
           </div>
 
-          <div className="mt-10 text-center">
+        </div>
+      </section>
+
+      {/* 3. PROFILES PREVIEW: FEATURED TATAS VERIFIEES */}
+      <section className="py-16 md:py-24">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+          
+          <div className="flex flex-col md:flex-row items-start md:items-end justify-between gap-4 mb-12">
+            <div className="space-y-2">
+              <span className="text-[11px] font-bold uppercase tracking-widest text-secondary block">
+                Sélection Rigoureuse de la Semaine
+              </span>
+              <h2 className="font-serif text-2xl sm:text-4xl text-on-surface font-semibold tracking-tight">
+                Tatas et Éducatrices Vedettes à Alger
+              </h2>
+              <p className="text-sm text-on-surface-variant">
+                Profils certifiés en personne, évalués par les familles de leurs communes.
+              </p>
+            </div>
+
             <Link
-              href="/securite-et-confiance"
-              className="inline-flex items-center gap-2 px-6 py-3 rounded-xl bg-white text-slate-900 font-bold text-xs hover:bg-slate-100 transition shadow-lg"
+              href="/services"
+              className="inline-flex items-center gap-2 px-5 py-2.5 rounded-full bg-surface-container-low hover:bg-surface-container text-primary font-bold text-xs border border-[#ded7ca] transition"
             >
-              <span>Lire notre charte de sécurité détaillée</span>
-              <ArrowRight className="w-4 h-4" />
+              <span>Voir tout l'annuaire certifié</span>
+              <span className="material-symbols-outlined text-base">arrow_forward</span>
             </Link>
           </div>
 
-        </div>
-      </section>
+          {/* Cards Grid */}
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
+            {(listings.length > 0 ? listings.slice(0, 3) : FEATURED_PROFILES).map((item: any) => {
+              const isStoreItem = !!item.provider;
+              const id = item.id;
+              const name = isStoreItem ? (item.provider?.full_name || item.title) : item.name;
+              const role = isStoreItem ? item.title : item.role;
+              const commune = isStoreItem ? (item.communes?.[0] || 'Alger') : item.commune;
+              const experience = isStoreItem ? (item.experience_years ? `${item.experience_years} ans d'expérience` : 'Expérimentée') : item.experience;
+              const photo = isStoreItem ? (item.provider?.avatar_url || 'https://images.unsplash.com/photo-1544005313-94ddf0286df2?auto=format&fit=crop&w=400&q=80') : item.photo;
+              const skills = isStoreItem ? (item.diplomas?.slice(0, 3) || ['Garde active', 'Vérifiée en personne']) : item.skills;
+              const price = isStoreItem ? `${item.hourly_rate || item.base_price || 1200} DA` : item.price;
+              const priceUnit = isStoreItem ? ` / ${item.price_unit || 'h'}` : item.priceUnit;
 
-      {/* SECTION 5: CONTACT DIRECT & FOIRE AUX QUESTIONS */}
-      <section className="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8 space-y-12">
-        
-        {/* Encadré d'appel coordinateur */}
-        <AdminCallCard
-          title="Une question urgente ou besoin d'une garde ce soir ?"
-          subtitle="Notre coordinateur de plateforme est joignable directement par téléphone à Alger."
-        />
-
-        {/* Foire Aux Questions */}
-        <div className="space-y-6">
-          <div className="text-center space-y-2">
-            <span className="text-xs font-bold uppercase tracking-wider text-indigo-600 bg-indigo-50 px-3 py-1 rounded-full">
-              Réponses Claires
-            </span>
-            <h2 className="text-2xl font-extrabold text-slate-900">Foire Aux Questions</h2>
-          </div>
-
-          <div className="divide-y divide-slate-200 bg-white rounded-3xl border border-slate-200 p-6 sm:p-8 shadow-sm">
-            {FAQ_ITEMS.map((item, idx) => {
-              const isOpen = openFaqIndex === idx;
               return (
-                <div key={idx} className="py-4 first:pt-0 last:pb-0">
-                  <button
-                    type="button"
-                    onClick={() => setOpenFaqIndex(isOpen ? null : idx)}
-                    className="w-full text-left flex items-center justify-between gap-4 group"
-                  >
-                    <span className="font-bold text-sm text-slate-900 group-hover:text-indigo-600 transition">
-                      {item.q}
-                    </span>
-                    <ChevronDown className={`w-4 h-4 text-slate-400 transition-transform ${isOpen ? 'rotate-180 text-indigo-600' : ''}`} />
-                  </button>
-                  {isOpen && (
-                    <p className="text-xs text-slate-600 mt-2.5 leading-relaxed pl-2 border-l-2 border-indigo-600 animate-in fade-in duration-200">
-                      {item.a}
-                    </p>
-                  )}
+                <div
+                  key={id}
+                  className="bg-surface-container-lowest rounded-3xl overflow-hidden shadow-sm border border-[#ded7ca] hover:shadow-xl transition flex flex-col group"
+                >
+                  {/* Image Frame & Badges */}
+                  <div className="relative h-60 w-full overflow-hidden bg-surface-container">
+                    <img
+                      src={photo}
+                      alt={name}
+                      className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
+                    />
+                    
+                    {/* Honey Gold Physical Verification Seal */}
+                    <div className="absolute top-3 left-3 bg-white/95 backdrop-blur-md px-3 py-1 rounded-full flex items-center gap-1.5 shadow-sm border border-[#D4A373]">
+                      <span className="material-symbols-outlined text-[#b7895b] text-base material-symbols-fill">verified</span>
+                      <span className="text-[10px] font-bold text-[#623f18] uppercase tracking-wide">
+                        Vérifiée en Main Propre
+                      </span>
+                    </div>
+
+                    {/* Commune Tag */}
+                    <div className="absolute bottom-3 left-3 bg-black/60 backdrop-blur-md text-white px-3 py-1 rounded-full text-xs font-semibold flex items-center gap-1">
+                      <span className="material-symbols-outlined text-sm text-[#ffb59e]">location_on</span>
+                      <span>{commune}, Alger</span>
+                    </div>
+                  </div>
+
+                  {/* Card Content */}
+                  <div className="p-6 flex-1 flex flex-col justify-between space-y-4">
+                    <div className="space-y-2">
+                      <div className="flex items-center justify-between">
+                        <h3 className="font-serif text-lg font-bold text-on-surface">
+                          {name}
+                        </h3>
+                        <div className="flex items-center gap-1 text-[#b7895b] text-xs font-bold">
+                          <span className="material-symbols-outlined text-sm material-symbols-fill">star</span>
+                          <span>5.0</span>
+                        </div>
+                      </div>
+
+                      <p className="text-xs text-primary font-semibold">{role}</p>
+                      <p className="text-xs text-on-surface-variant">{experience}</p>
+
+                      {/* Skills Badges */}
+                      <div className="flex flex-wrap gap-1.5 pt-2">
+                        {skills.map((skill: string, idx: number) => (
+                          <span
+                            key={idx}
+                            className="text-[10px] font-medium bg-[#f4f1ea] text-on-surface-variant px-2.5 py-1 rounded-full"
+                          >
+                            {skill}
+                          </span>
+                        ))}
+                      </div>
+                    </div>
+
+                    {/* Pricing & CTA */}
+                    <div className="pt-4 border-t border-[#ded7ca] flex items-center justify-between">
+                      <div>
+                        <span className="text-[10px] text-on-surface-variant uppercase font-bold block">
+                          Tarif convenu
+                        </span>
+                        <span className="font-bold text-sm text-primary">
+                          {price} <span className="text-[11px] text-on-surface-variant font-normal">{priceUnit}</span>
+                        </span>
+                      </div>
+
+                      <Link
+                        href={`/services/${id}`}
+                        className="px-4 py-2 rounded-xl bg-primary hover:bg-primary-600 text-white text-xs font-bold shadow-sm transition"
+                      >
+                        Consulter Profil
+                      </Link>
+                    </div>
+
+                  </div>
                 </div>
               );
             })}
           </div>
 
-          <div className="text-center">
-            <Link
-              href="/faq"
-              className="text-xs font-bold text-indigo-600 hover:underline inline-flex items-center gap-1"
+        </div>
+      </section>
+
+      {/* 4. INTERACTIVE COVERAGE: LES 57 COMMUNES D'ALGER */}
+      <section className="py-16 bg-[#FAF8F5] border-t border-[#e4dec7]">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+          
+          <div className="bg-surface-container-lowest rounded-3xl p-8 md:p-12 shadow-sm border border-[#ded7ca]">
+            <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-center">
+              
+              <div className="lg:col-span-5 space-y-4">
+                <span className="text-[11px] font-bold uppercase tracking-widest text-primary block">
+                  Couverture Complète Wilaya d'Alger
+                </span>
+                <h2 className="font-serif text-2xl sm:text-3xl text-on-surface font-semibold tracking-tight leading-snug">
+                  Du Cœur de la Baie aux Collines du Sahel Algérois
+                </h2>
+                <p className="text-xs sm:text-sm text-on-surface-variant leading-relaxed">
+                  TataWafa déploie des intervenantes de proximité directement dans votre quartier pour minimiser les temps de trajet et garantir une ponctualité exemplaire.
+                </p>
+                <div className="pt-2">
+                  <Link
+                    href="/tarifs-et-communes"
+                    className="inline-flex items-center gap-2 text-xs font-bold text-primary hover:underline"
+                  >
+                    <span>Consulter le détail des 57 communes et tarifs</span>
+                    <span className="material-symbols-outlined text-base">arrow_forward</span>
+                  </Link>
+                </div>
+              </div>
+
+              <div className="lg:col-span-7 grid grid-cols-1 sm:grid-cols-3 gap-4">
+                
+                {/* Zone 1 */}
+                <div className="bg-[#FAF8F5] p-5 rounded-2xl border border-[#ded7ca] space-y-2">
+                  <div className="flex items-center gap-2 text-primary font-bold text-xs">
+                    <span className="material-symbols-outlined text-base">apartment</span>
+                    <span>Alger Centre &amp; Collines</span>
+                  </div>
+                  <p className="text-[11px] text-on-surface-variant leading-relaxed">
+                    Hydra, El Biar, Ben Aknoun, El Mouradia, Alger Centre, Kasbah, Bab El Oued, Bouzareah...
+                  </p>
+                  <span className="text-[10px] font-bold text-secondary block pt-1">100% de disponibilité</span>
+                </div>
+
+                {/* Zone 2 */}
+                <div className="bg-[#FAF8F5] p-5 rounded-2xl border border-[#ded7ca] space-y-2">
+                  <div className="flex items-center gap-2 text-primary font-bold text-xs">
+                    <span className="material-symbols-outlined text-base">waves</span>
+                    <span>Ouest &amp; Littoral</span>
+                  </div>
+                  <p className="text-[11px] text-on-surface-variant leading-relaxed">
+                    Chéraga, Dely Ibrahim, Ouled Fayet, Zéralda, Staoueli, Ain Benian, Draria, Douera...
+                  </p>
+                  <span className="text-[10px] font-bold text-secondary block pt-1">Garde active &amp; Périscolaire</span>
+                </div>
+
+                {/* Zone 3 */}
+                <div className="bg-[#FAF8F5] p-5 rounded-2xl border border-[#ded7ca] space-y-2">
+                  <div className="flex items-center gap-2 text-primary font-bold text-xs">
+                    <span className="material-symbols-outlined text-base">sunny</span>
+                    <span>Est &amp; Mitidja</span>
+                  </div>
+                  <p className="text-[11px] text-on-surface-variant leading-relaxed">
+                    Kouba, Hussein Dey, Bir Mourad Raïs, Mohammadia, Bordj El Kiffan, Rouiba, Reghaia...
+                  </p>
+                  <span className="text-[10px] font-bold text-secondary block pt-1">Soutien scolaire &amp; Nounous</span>
+                </div>
+
+              </div>
+
+            </div>
+          </div>
+
+        </div>
+      </section>
+
+      {/* 5. HOW IT WORKS: LE PARCOURS PARENTAL */}
+      <section className="py-16 md:py-24 bg-[#ede8df]/40">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+          
+          <div className="text-center max-w-3xl mx-auto mb-16 space-y-3">
+            <span className="text-[11px] font-bold uppercase tracking-widest text-primary block">
+              Simplicité &amp; Sérénité
+            </span>
+            <h2 className="font-serif text-2xl sm:text-4xl text-on-surface font-semibold tracking-tight">
+              Comment Fonctionne la Mise en Relation
+            </h2>
+            <p className="text-sm text-on-surface-variant">
+              Un accompagnement humain de A à Z par téléphone, sans carte bancaire ni démarche complexe.
+            </p>
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-8 relative">
+            
+            {/* Step 1 */}
+            <div className="bg-surface-container-lowest p-8 rounded-3xl shadow-sm border border-[#ded7ca] relative space-y-4">
+              <div className="w-10 h-10 rounded-full bg-primary text-white flex items-center justify-center font-bold text-sm">
+                1
+              </div>
+              <h3 className="font-serif text-lg font-bold text-on-surface">
+                Exprimez Votre Besoin
+              </h3>
+              <p className="text-xs text-on-surface-variant leading-relaxed">
+                Choisissez votre commune et le profil qui correspond aux besoins de vos enfants (garde ponctuelle, temps plein ou soutien scolaire).
+              </p>
+            </div>
+
+            {/* Step 2 */}
+            <div className="bg-surface-container-lowest p-8 rounded-3xl shadow-sm border border-[#ded7ca] relative space-y-4">
+              <div className="w-10 h-10 rounded-full bg-secondary text-white flex items-center justify-center font-bold text-sm">
+                2
+              </div>
+              <h3 className="font-serif text-lg font-bold text-on-surface">
+                Validation &amp; Appel Direct
+              </h3>
+              <p className="text-xs text-on-surface-variant leading-relaxed">
+                Notre coordinateur vous contacte par téléphone sous 2 heures pour confirmer les détails et convenir d'une première rencontre à domicile.
+              </p>
+            </div>
+
+            {/* Step 3 */}
+            <div className="bg-surface-container-lowest p-8 rounded-3xl shadow-sm border border-[#ded7ca] relative space-y-4">
+              <div className="w-10 h-10 rounded-full bg-tertiary text-white flex items-center justify-center font-bold text-sm">
+                3
+              </div>
+              <h3 className="font-serif text-lg font-bold text-on-surface">
+                Garde &amp; Règlement en Espèces
+              </h3>
+              <p className="text-xs text-on-surface-variant leading-relaxed">
+                Votre nounou certifiée prend soin de vos enfants. Le règlement s'effectue directement en espèces (DA) sans aucun paiement en ligne.
+              </p>
+            </div>
+
+          </div>
+
+        </div>
+      </section>
+
+      {/* 6. FAQ HYPER-LOCALE ALGER */}
+      <section className="py-16 md:py-24">
+        <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 space-y-8">
+          
+          <div className="text-center space-y-3">
+            <span className="text-[11px] font-bold uppercase tracking-widest text-primary block">
+              Questions Fréquentes
+            </span>
+            <h2 className="font-serif text-2xl sm:text-3xl text-on-surface font-semibold tracking-tight">
+              Tout ce que les Familles d'Alger Veulent Savoir
+            </h2>
+          </div>
+
+          <div className="space-y-4">
+            {[
+              {
+                q: 'Comment sont vérifiées les pièces d\'identité et les diplômes ?',
+                a: 'Chaque prestataire se présente physiquement à notre bureau d\'Alger avec ses originaux (Carte Nationale d\'Identité biométrique, extrait de casier judiciaire bulletin n°3, diplômes ou attestations). Aucun document n\'est numérisé ni téléversé sur Internet.'
+              },
+              {
+                q: 'Pourquoi n\'y a-t-il aucun paiement par carte bancaire sur le site ?',
+                a: 'En Algérie, la confiance et la flexibilité passent par le règlement direct en espèces (Dinars Algériens). Les familles règlent directement le prestataire convenu selon les modalités fixées lors de la réservation (à la séance ou en fin de mois).'
+              },
+              {
+                q: 'Puis-je rencontrer la nounou avant de démarrer une garde régulière ?',
+                a: 'Absolument. Nous encourageons systématiquement une première visite de présentation de 30 minutes à votre domicile afin que l\'enfant et les parents fassent connaissance avec la nounou en toute sérénité.'
+              },
+              {
+                q: 'Que faire en cas d\'urgence ou de besoin immédiat ?',
+                a: 'Notre permanence téléphonique est joignable 7 jours sur 7 au 0550 12 34 56 ou via WhatsApp. Nous mobilisons une nounou disponible dans votre commune en moins de 3 heures.'
+              }
+            ].map((faq, idx) => (
+              <div
+                key={idx}
+                className="bg-surface-container-lowest rounded-2xl border border-[#ded7ca] overflow-hidden"
+              >
+                <button
+                  type="button"
+                  onClick={() => setOpenFaq(openFaq === idx ? null : idx)}
+                  className="w-full text-left p-5 flex items-center justify-between gap-4 font-serif font-bold text-sm sm:text-base text-on-surface hover:text-primary transition"
+                >
+                  <span>{faq.q}</span>
+                  <span className="material-symbols-outlined text-primary text-xl shrink-0">
+                    {openFaq === idx ? 'remove' : 'add'}
+                  </span>
+                </button>
+                {openFaq === idx && (
+                  <div className="px-5 pb-5 text-xs sm:text-sm text-on-surface-variant leading-relaxed border-t border-[#ded7ca]/50 pt-3">
+                    {faq.a}
+                  </div>
+                )}
+              </div>
+            ))}
+          </div>
+
+        </div>
+      </section>
+
+      {/* 7. FINAL CALL TO ACTION: DIRECT CONNECTION */}
+      <section className="py-16 bg-[#17222d] text-white">
+        <div className="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8 text-center space-y-6">
+          <div className="inline-flex items-center gap-2 px-3.5 py-1 rounded-full bg-primary-fixed/20 border border-primary-fixed/30 text-primary-fixed text-xs font-bold">
+            <span className="material-symbols-outlined text-sm">support_agent</span>
+            <span>Permanence Téléphonique Alger 7j/7</span>
+          </div>
+
+          <h2 className="font-serif text-3xl sm:text-4xl lg:text-5xl font-normal leading-tight">
+            Prêt à trouver la personne idéale pour vos enfants ?
+          </h2>
+
+          <p className="text-sm sm:text-base text-[#ded7ca] max-w-2xl mx-auto font-normal">
+            Appelez-nous directement ou échangez avec le coordinateur sur WhatsApp pour une réponse immédiate.
+          </p>
+
+          <div className="flex flex-wrap items-center justify-center gap-4 pt-4">
+            <a
+              href={`tel:${ADMIN_CONTACT.phone}`}
+              className="px-6 py-3.5 rounded-2xl bg-primary hover:bg-primary-600 text-white font-bold text-sm shadow-md transition flex items-center gap-2 cursor-pointer"
             >
-              <span>Consulter toutes les questions fréquentes →</span>
-            </Link>
+              <span className="material-symbols-outlined text-lg">call</span>
+              <span>Appeler le {ADMIN_CONTACT.phone}</span>
+            </a>
+
+            <button
+              type="button"
+              onClick={() => setShowWhatsAppModal(true)}
+              className="px-6 py-3.5 rounded-2xl bg-secondary hover:bg-secondary-600 text-white font-bold text-sm shadow-md transition flex items-center gap-2 cursor-pointer"
+            >
+              <span className="material-symbols-outlined text-lg">chat</span>
+              <span>Contacter sur WhatsApp</span>
+            </button>
+          </div>
+
+        </div>
+      </section>
+
+      {/* 8. WHATSAPP INTERACTIVE MODAL */}
+      {showWhatsAppModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm animate-in fade-in duration-200">
+          <div className="bg-surface-container-lowest max-w-md w-full rounded-3xl p-6 sm:p-8 shadow-2xl border border-[#ded7ca] space-y-4">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-2.5">
+                <div className="w-10 h-10 rounded-2xl bg-secondary-fixed text-secondary flex items-center justify-center">
+                  <span className="material-symbols-outlined text-xl">chat</span>
+                </div>
+                <div>
+                  <h3 className="font-serif font-bold text-base text-on-surface">
+                    Coordination WhatsApp
+                  </h3>
+                  <p className="text-xs text-on-surface-variant">Liaison directe avec Alger</p>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => setShowWhatsAppModal(false)}
+                className="p-1 rounded-full text-on-surface-variant hover:bg-[#FAF8F5]"
+              >
+                <span className="material-symbols-outlined text-xl">close</span>
+              </button>
+            </div>
+
+            <p className="text-xs text-on-surface-variant leading-relaxed">
+              Personnalisez votre message pour le coordinateur TataWafa. Nous vous répondrons dans les plus brefs délais :
+            </p>
+
+            <textarea
+              value={whatsAppText}
+              onChange={(e) => setWhatsAppText(e.target.value)}
+              rows={4}
+              className="w-full p-3.5 rounded-2xl bg-[#FAF8F5] border border-[#ded7ca] text-xs sm:text-sm text-on-surface focus:outline-none focus:ring-2 focus:ring-secondary/30 resize-none font-medium"
+            />
+
+            <div className="flex items-center justify-end gap-3 pt-2">
+              <button
+                type="button"
+                onClick={() => setShowWhatsAppModal(false)}
+                className="px-4 py-2.5 rounded-xl text-xs font-semibold text-on-surface-variant hover:bg-[#FAF8F5]"
+              >
+                Annuler
+              </button>
+              <button
+                type="button"
+                onClick={openWhatsAppDirect}
+                className="px-5 py-2.5 rounded-xl bg-secondary hover:bg-secondary-600 text-white font-bold text-xs shadow-sm transition flex items-center gap-1.5"
+              >
+                <span>Ouvrir WhatsApp</span>
+                <span className="material-symbols-outlined text-sm">send</span>
+              </button>
+            </div>
+
           </div>
         </div>
-
-      </section>
+      )}
 
     </div>
   );

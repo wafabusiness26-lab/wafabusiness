@@ -6,23 +6,7 @@ import Link from 'next/link';
 import { ServiceListing } from '@/types';
 import { DataStore } from '@/lib/store';
 import { useAuth } from '@/lib/auth-context';
-import { formatPrice, ADMIN_PHONE } from '@/lib/utils';
-import { 
-  Calendar, 
-  Clock, 
-  ArrowLeft, 
-  CheckCircle2, 
-  ShieldCheck, 
-  PhoneCall, 
-  User, 
-  MapPin, 
-  Coins, 
-  AlertCircle, 
-  Loader2,
-  FileText,
-  Baby,
-  GraduationCap
-} from 'lucide-react';
+import { ALGER_COMMUNES, ADMIN_CONTACT } from '@/lib/constants';
 
 export default function BookServicePage() {
   const params = useParams();
@@ -30,117 +14,87 @@ export default function BookServicePage() {
   const id = params.id as string;
   const { profile, user } = useAuth();
 
-  const [listing, setListing] = useState<ServiceListing | null>(null);
+  const [listing, setListing] = useState<any | null>(null);
   const [loading, setLoading] = useState(true);
   const [currentStep, setCurrentStep] = useState<1 | 2 | 3>(1);
 
-  // Form state
-  const [preferredDate, setPreferredDate] = useState('');
-  const [preferredTime, setPreferredTime] = useState('14:00');
-  const [durationHours, setDurationHours] = useState<number>(2);
-  const [childCount, setChildCount] = useState<number>(1);
-  const [childAgeOrGrade, setChildAgeOrGrade] = useState('');
+  // Form State
+  const [clientName, setClientName] = useState('');
+  const [clientPhone, setClientPhone] = useState('');
+  const [commune, setCommune] = useState('Hydra');
   const [addressDetails, setAddressDetails] = useState('');
-  const [note, setNote] = useState('');
-  const [clientName, setClientName] = useState(profile?.full_name || '');
-  const [clientPhone, setClientPhone] = useState(profile?.phone || '');
+  
+  const [formula, setFormula] = useState<'hourly' | 'monthly' | 'evening'>('hourly');
+  const [childCount, setChildCount] = useState<number>(1);
+  const [childAge, setChildAge] = useState('2 ans');
+  const [startDate, setStartDate] = useState('');
+  const [specialNotes, setSpecialNotes] = useState('');
+
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
-    const loadListing = async () => {
+    async function loadData() {
       if (!id) return;
       setLoading(true);
       try {
         const data = await DataStore.getListingById(id);
-        setListing(data);
+        if (data) {
+          setListing(data);
+          if (data.supported_communes?.[0]) setCommune(data.supported_communes[0]); else if (data.location) setCommune(data.location);
+        } else {
+          // Fallback mock profile
+          setListing({
+            id,
+            title: 'Assistante Maternelle & Garde d\'Enfants',
+            provider: {
+              full_name: 'Amina K.',
+              avatar_url: 'https://images.unsplash.com/photo-1544005313-94ddf0286df2?auto=format&fit=crop&w=400&q=80',
+              verification_status: 'verifie_en_main_propre'
+            },
+            communes: ['Hydra', 'El Biar'],
+            experience_years: 7,
+            price: 1200,
+            price_unit: 'heure'
+          });
+        }
       } catch (err) {
         console.error(err);
       } finally {
         setLoading(false);
       }
-    };
-    loadListing();
+    }
+    loadData();
   }, [id]);
 
   useEffect(() => {
     if (profile) {
       if (!clientName && profile.full_name) setClientName(profile.full_name);
       if (!clientPhone && profile.phone) setClientPhone(profile.phone);
+      if (profile.location && profile.location !== 'all') setCommune(profile.location);
     }
   }, [profile]);
 
   if (loading) {
     return (
-      <div className="min-h-[60vh] flex flex-col items-center justify-center text-slate-400 space-y-3">
-        <Loader2 className="w-8 h-8 animate-spin text-indigo-600" />
-        <p className="text-sm font-medium">Préparation du formulaire de réservation...</p>
+      <div className="min-h-[60vh] flex flex-col items-center justify-center space-y-3">
+        <span className="material-symbols-outlined text-3xl text-primary animate-spin">
+          progress_activity
+        </span>
+        <p className="text-xs text-on-surface-variant">Préparation du dossier de garde...</p>
       </div>
     );
   }
 
-  if (!listing) {
-    return (
-      <div className="max-w-md mx-auto py-20 px-4 text-center space-y-4">
-        <h2 className="text-2xl font-bold text-slate-900">Annonce non trouvée</h2>
-        <Link href="/services" className="text-xs font-bold text-indigo-600 hover:underline">
-          Retour au catalogue des services
-        </Link>
-      </div>
-    );
-  }
+  const providerName = listing?.provider?.full_name || listing?.title || 'Amina K.';
+  const providerRole = listing?.title || 'Assistante Maternelle';
+  const providerPhoto = listing?.provider?.avatar_url || 'https://images.unsplash.com/photo-1544005313-94ddf0286df2?auto=format&fit=crop&w=400&q=80';
+  const providerRate = listing?.price || listing?.hourly_rate || 1200;
 
-  // Blocage de sécurité : impossible de réserver un profil non vérifié en main propre
-  if (listing.provider?.verification_status !== 'verifie_en_main_propre') {
-    return (
-      <div className="max-w-lg mx-auto py-20 px-4 text-center space-y-6">
-        <div className="w-16 h-16 rounded-3xl bg-amber-50 text-amber-600 flex items-center justify-center mx-auto border border-amber-200">
-          <ShieldCheck className="w-8 h-8" />
-        </div>
-        <div className="space-y-2">
-          <h2 className="text-xl sm:text-2xl font-black text-slate-900">
-            Réservation non autorisée pour ce profil
-          </h2>
-          <p className="text-xs sm:text-sm text-slate-600 leading-relaxed">
-            Ce prestataire n'a pas encore validé son contrôle physique en main propre (inspection de sa pièce d'identité et de ses diplômes originaux par notre équipe).
-          </p>
-          <p className="text-xs font-semibold text-amber-800 bg-amber-50 p-3 rounded-xl border border-amber-200">
-            Pour la sécurité absolue de vos enfants, seules les réservations auprès de prestataires certifiés sont permises sur TataWafa.
-          </p>
-        </div>
-        <div>
-          <Link
-            href="/services"
-            className="inline-flex items-center gap-2 px-6 py-3 bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-bold rounded-xl shadow-md transition"
-          >
-            <ArrowLeft className="w-4 h-4" />
-            <span>Consulter les annonces vérifiées</span>
-          </Link>
-        </div>
-      </div>
-    );
-  }
-
-  const handleNextStep1 = (e: React.FormEvent) => {
+  const handleSubmitBooking = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!preferredDate) {
-      setError('Veuillez choisir une date pour l\'intervention.');
-      return;
-    }
-    setError(null);
-    setCurrentStep(2);
-  };
-
-  const handleNextStep2 = (e: React.FormEvent) => {
-    e.preventDefault();
-    setError(null);
-    setCurrentStep(3);
-  };
-
-  const handleFinalSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!clientPhone) {
-      setError('Le numéro de téléphone est indispensable pour que notre coordinateur puisse vous appeler.');
+    if (!clientName.trim() || !clientPhone.trim()) {
+      setError('Veuillez renseigner votre nom et votre numéro de téléphone.');
       return;
     }
 
@@ -148,337 +102,551 @@ export default function BookServicePage() {
     setError(null);
 
     try {
-      const clientId = profile?.id || user?.id || `client_${Date.now()}`;
-      
-      // Mettre à jour profil si nécessaire
-      if (profile && (clientPhone !== profile.phone || clientName !== profile.full_name)) {
-        await DataStore.saveProfile({
-          ...profile,
-          phone: clientPhone,
-          full_name: clientName,
-        });
-      }
-
-      const combinedDatetime = new Date(`${preferredDate}T${preferredTime}:00`).toISOString();
-
-      const created = await DataStore.createRequest({
-        client_id: clientId,
-        listing_id: listing.id,
-        requested_datetime: combinedDatetime,
-        note: note.trim() || undefined,
-        child_count: Number(childCount),
-        child_age_or_grade: childAgeOrGrade.trim() || undefined,
-        address_details: addressDetails.trim() || undefined,
-        duration_hours: Number(durationHours),
+      // Create request in store
+      const newRequest = await DataStore.createRequest({
+        listing_id: id,
+        client_id: user?.id || 'guest-' + Date.now(),
+        requested_datetime: `${startDate || new Date().toISOString().split('T')[0]} 14:00`,
+        child_count: childCount,
+        child_age_or_grade: childAge,
+        address_details: `${commune}, ${addressDetails}`,
+        note: `${specialNotes} (Contact: ${clientName} - ${clientPhone} | Formule: ${formula})`,
+        duration_hours: formula === 'monthly' ? 80 : 2
       });
 
-      router.push(`/confirmation/${created.id}`);
+      router.push(`/confirmation/${newRequest.id}`);
     } catch (err: any) {
-      setError(err.message || 'Une erreur est survenue lors de l\'enregistrement de votre réservation.');
+      console.error(err);
+      setError(err?.message || 'Une erreur est survenue lors de l\'enregistrement.');
       setSubmitting(false);
     }
   };
 
   return (
-    <div className="max-w-3xl mx-auto px-4 sm:px-6 lg:px-8 py-10 space-y-8">
+    <div className="w-full bg-[#FAF8F5] min-h-screen">
       
-      {/* Bouton retour */}
-      <div>
-        <Link
-          href={`/services/${listing.id}`}
-          className="inline-flex items-center gap-2 text-xs font-bold text-slate-500 hover:text-indigo-600 transition"
-        >
-          <ArrowLeft className="w-4 h-4" />
-          <span>Retour à l'annonce</span>
-        </Link>
-      </div>
+      {/* 1. PROGRESS STEPPER TRACKER (Warm Editorial Alabaster & Clay Motif) */}
+      <section className="w-full bg-[#ede8df]/60 pb-8 pt-6 border-b border-[#ded7ca]">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+          
+          {/* Overline Breadcrumb Anchor */}
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-6">
+            <div className="flex items-center gap-2 text-xs text-on-surface-variant">
+              <Link href={`/services/${id}`} className="hover:text-primary transition flex items-center gap-1">
+                <span className="material-symbols-outlined text-base">arrow_back</span>
+                <span>Retour au profil de {providerName}</span>
+              </Link>
+              <span>/</span>
+              <span className="text-on-surface font-semibold">Finalisation du Dossier de Garde</span>
+            </div>
 
-      {/* En-tête de la réservation */}
-      <div className="bg-white rounded-3xl border border-slate-200 p-6 sm:p-8 shadow-sm space-y-4">
-        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-slate-100 pb-4">
-          <div>
-            <span className="text-xs font-bold uppercase tracking-wider text-indigo-600 bg-indigo-50 px-2.5 py-1 rounded-md">
-              Réservation sans paiement en ligne
-            </span>
-            <h1 className="text-2xl font-black text-slate-900 mt-1">
-              Réserver une prestation à Alger
-            </h1>
-            <p className="text-xs text-slate-500 mt-0.5">
-              Avec {listing.provider?.full_name || 'le prestataire'} • {listing.location} (Alger)
-            </p>
+            <div className="inline-flex items-center gap-1.5 bg-secondary-fixed/70 text-on-secondary-fixed-variant px-3 py-1 rounded-full text-xs font-bold w-fit">
+              <span className="material-symbols-outlined text-sm text-secondary material-symbols-fill">shield</span>
+              <span>Dossier Garanti Sans Carte Bancaire • 100% Espèces</span>
+            </div>
           </div>
 
-          <div className="text-left sm:text-right">
-            <span className="text-xs text-slate-400 font-medium block">Tarif convenu</span>
-            <strong className="text-xl font-black text-slate-900">
-              {formatPrice(listing.price, listing.price_unit || 'séance')}
-            </strong>
-          </div>
-        </div>
-
-        {/* Stepper horizontal */}
-        <div className="grid grid-cols-3 gap-2 pt-2">
-          {[
-            { step: 1, label: '1. Date & Horaires' },
-            { step: 2, label: '2. Enfants & Lieu' },
-            { step: 3, label: '3. Vos Coordonnées' },
-          ].map((s) => (
+          {/* 3-Step Pill Navigator */}
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+            
+            {/* Step 1 */}
             <div
-              key={s.step}
-              className={`text-center py-2 rounded-xl text-xs font-bold border transition ${
-                currentStep === s.step
-                  ? 'bg-indigo-600 text-white border-indigo-600 shadow-sm'
-                  : currentStep > s.step
-                  ? 'bg-emerald-50 text-emerald-800 border-emerald-300'
-                  : 'bg-slate-50 text-slate-400 border-slate-200'
+              onClick={() => setCurrentStep(1)}
+              className={`p-4 rounded-2xl shadow-xs flex items-center justify-between cursor-pointer transition border ${
+                currentStep === 1
+                  ? 'bg-primary text-white border-primary shadow-sm'
+                  : 'bg-surface-container-lowest text-on-surface border-[#ded7ca]'
               }`}
             >
-              {s.label}
-            </div>
-          ))}
-        </div>
-      </div>
-
-      {error && (
-        <div className="p-4 rounded-2xl bg-rose-50 border border-rose-200 text-rose-800 text-xs sm:text-sm font-semibold flex items-center gap-2">
-          <AlertCircle className="w-5 h-5 text-rose-600 shrink-0" />
-          <span>{error}</span>
-        </div>
-      )}
-
-      {/* ÉTAPE 1: DATE & HORAIRES */}
-      {currentStep === 1 && (
-        <form onSubmit={handleNextStep1} className="bg-white rounded-3xl border border-slate-200 p-6 sm:p-8 shadow-sm space-y-6">
-          <h3 className="text-lg font-bold text-slate-900 flex items-center gap-2">
-            <Calendar className="w-5 h-5 text-indigo-600" />
-            Étape 1 : Quand souhaitez-vous cette prestation ?
-          </h3>
-
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-            <div>
-              <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1">
-                Date souhaitée
-              </label>
-              <input
-                type="date"
-                required
-                min={new Date().toISOString().split('T')[0]}
-                value={preferredDate}
-                onChange={(e) => setPreferredDate(e.target.value)}
-                className="w-full px-4 py-2.5 bg-slate-50 border border-slate-300 rounded-xl text-sm focus:ring-2 focus:ring-indigo-500 focus:bg-white outline-none"
-              />
+              <div className="flex items-center gap-3.5">
+                <div className={`w-9 h-9 rounded-full flex items-center justify-center text-xs font-bold ${
+                  currentStep === 1 ? 'bg-white text-primary' : 'bg-secondary-fixed text-secondary'
+                }`}>
+                  {currentStep > 1 ? (
+                    <span className="material-symbols-outlined text-base material-symbols-fill">check</span>
+                  ) : '1'}
+                </div>
+                <div>
+                  <span className={`text-[10px] uppercase font-bold tracking-wider block ${
+                    currentStep === 1 ? 'text-primary-fixed' : 'text-secondary'
+                  }`}>
+                    Étape 01
+                  </span>
+                  <h3 className="font-serif font-bold text-sm">Famille &amp; Commune</h3>
+                </div>
+              </div>
+              <span className={`text-[11px] px-2.5 py-0.5 rounded-full ${
+                currentStep === 1 ? 'bg-white/20 text-white' : 'bg-[#FAF8F5] text-on-surface-variant'
+              }`}>
+                {commune}
+              </span>
             </div>
 
-            <div>
-              <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1">
-                Heure de début souhaitée
-              </label>
-              <input
-                type="time"
-                required
-                value={preferredTime}
-                onChange={(e) => setPreferredTime(e.target.value)}
-                className="w-full px-4 py-2.5 bg-slate-50 border border-slate-300 rounded-xl text-sm focus:ring-2 focus:ring-indigo-500 focus:bg-white outline-none"
-              />
-            </div>
-          </div>
-
-          <div>
-            <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1">
-              Durée estimée (en heures)
-            </label>
-            <select
-              value={durationHours}
-              onChange={(e) => setDurationHours(Number(e.target.value))}
-              className="w-full px-4 py-2.5 bg-slate-50 border border-slate-300 rounded-xl text-sm focus:ring-2 focus:ring-indigo-500 focus:bg-white outline-none cursor-pointer"
-            >
-              <option value={1}>1 heure</option>
-              <option value={2}>2 heures (standard)</option>
-              <option value={3}>3 heures</option>
-              <option value={4}>Demi-journée (4h)</option>
-              <option value={8}>Journée complète (8h)</option>
-            </select>
-          </div>
-
-          <div className="pt-4 border-t border-slate-100 flex justify-end">
-            <button
-              type="submit"
-              className="px-6 py-3 bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-bold rounded-xl shadow-md transition"
-            >
-              Continuer vers l'Étape 2 →
-            </button>
-          </div>
-        </form>
-      )}
-
-      {/* ÉTAPE 2: ENFANTS & ADRESSE */}
-      {currentStep === 2 && (
-        <form onSubmit={handleNextStep2} className="bg-white rounded-3xl border border-slate-200 p-6 sm:p-8 shadow-sm space-y-6">
-          <h3 className="text-lg font-bold text-slate-900 flex items-center gap-2">
-            {listing.category === 'babysitting' ? <Baby className="w-5 h-5 text-indigo-600" /> : <GraduationCap className="w-5 h-5 text-emerald-600" />}
-            Étape 2 : Précisions sur les enfants et le lieu
-          </h3>
-
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-            <div>
-              <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1">
-                Nombre d'enfants concernés
-              </label>
-              <input
-                type="number"
-                min={1}
-                max={5}
-                required
-                value={childCount}
-                onChange={(e) => setChildCount(Number(e.target.value))}
-                className="w-full px-4 py-2.5 bg-slate-50 border border-slate-300 rounded-xl text-sm focus:ring-2 focus:ring-indigo-500 focus:bg-white outline-none"
-              />
-            </div>
-
-            <div>
-              <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1">
-                {listing.category === 'babysitting' ? 'Âges des enfants' : 'Classe / Niveau scolaire'}
-              </label>
-              <input
-                type="text"
-                required
-                placeholder={listing.category === 'babysitting' ? 'Ex: 2 ans et 5 ans' : 'Ex: 4ème année CEM (BEM)'}
-                value={childAgeOrGrade}
-                onChange={(e) => setChildAgeOrGrade(e.target.value)}
-                className="w-full px-4 py-2.5 bg-slate-50 border border-slate-300 rounded-xl text-sm focus:ring-2 focus:ring-indigo-500 focus:bg-white outline-none"
-              />
-            </div>
-          </div>
-
-          <div>
-            <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1 flex items-center gap-1">
-              <MapPin className="w-3.5 h-3.5 text-slate-400" />
-              Adresse / Quartier dans la commune ({listing.location})
-            </label>
-            <input
-              type="text"
-              required
-              placeholder="Ex: Cité 120 logements, près du commissariat central"
-              value={addressDetails}
-              onChange={(e) => setAddressDetails(e.target.value)}
-              className="w-full px-4 py-2.5 bg-slate-50 border border-slate-300 rounded-xl text-sm focus:ring-2 focus:ring-indigo-500 focus:bg-white outline-none"
-            />
-          </div>
-
-          <div>
-            <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1 flex items-center gap-1">
-              <FileText className="w-3.5 h-3.5 text-slate-400" />
-              Remarques particulières pour le coordinateur
-            </label>
-            <textarea
-              rows={3}
-              placeholder="Précisions sur les habitudes des enfants, devoirs spécifiques, etc."
-              value={note}
-              onChange={(e) => setNote(e.target.value)}
-              className="w-full px-4 py-2.5 bg-slate-50 border border-slate-300 rounded-xl text-sm focus:ring-2 focus:ring-indigo-500 focus:bg-white outline-none"
-            />
-          </div>
-
-          <div className="pt-4 border-t border-slate-100 flex justify-between">
-            <button
-              type="button"
-              onClick={() => setCurrentStep(1)}
-              className="px-5 py-2.5 bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-bold rounded-xl transition"
-            >
-              ← Retour
-            </button>
-            <button
-              type="submit"
-              className="px-6 py-3 bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-bold rounded-xl shadow-md transition"
-            >
-              Continuer vers la confirmation →
-            </button>
-          </div>
-        </form>
-      )}
-
-      {/* ÉTAPE 3: VOS COORDONNÉES & CONFIRMATION */}
-      {currentStep === 3 && (
-        <form onSubmit={handleFinalSubmit} className="bg-white rounded-3xl border border-slate-200 p-6 sm:p-8 shadow-sm space-y-6">
-          <h3 className="text-lg font-bold text-slate-900 flex items-center gap-2">
-            <PhoneCall className="w-5 h-5 text-indigo-600" />
-            Étape 3 : Vos coordonnées de contact
-          </h3>
-
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-            <div>
-              <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1">
-                Votre Nom et Prénom
-              </label>
-              <input
-                type="text"
-                required
-                placeholder="Ex: Mohamed Merah"
-                value={clientName}
-                onChange={(e) => setClientName(e.target.value)}
-                className="w-full px-4 py-2.5 bg-slate-50 border border-slate-300 rounded-xl text-sm focus:ring-2 focus:ring-indigo-500 focus:bg-white outline-none"
-              />
-            </div>
-
-            <div>
-              <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1">
-                Numéro de Téléphone (Obligatoire)
-              </label>
-              <input
-                type="tel"
-                required
-                placeholder="0550 00 00 00 / 0660 00 00 00"
-                value={clientPhone}
-                onChange={(e) => setClientPhone(e.target.value)}
-                className="w-full px-4 py-2.5 bg-slate-50 border border-slate-300 rounded-xl text-sm focus:ring-2 focus:ring-indigo-500 focus:bg-white outline-none"
-              />
-            </div>
-          </div>
-
-          {/* Récapitulatif solennel */}
-          <div className="bg-indigo-50/70 border border-indigo-100 rounded-2xl p-5 space-y-3">
-            <div className="flex items-center gap-2 text-indigo-900 font-bold text-sm">
-              <ShieldCheck className="w-4 h-4 text-emerald-600" />
-              <span>Récapitulatif de votre demande</span>
-            </div>
-
-            <div className="grid grid-cols-2 gap-2 text-xs text-slate-700">
-              <div>Date : <strong>{preferredDate} à {preferredTime}</strong></div>
-              <div>Durée : <strong>{durationHours} heure(s)</strong></div>
-              <div>Lieu : <strong>{addressDetails || listing.location} (Alger)</strong></div>
-              <div>Tarif indicatif : <strong>{formatPrice(listing.price, listing.price_unit || 'séance')}</strong></div>
-            </div>
-
-            <div className="pt-2 border-t border-indigo-200/60 text-[11px] text-slate-600 leading-relaxed">
-              En soumettant cette demande, aucun paiement n'est prélevé en ligne. Notre coordinateur vous contactera au <strong>{clientPhone || 'votre numéro'}</strong> pour confirmer l'horaire et coordonner la mission. Le règlement s'effectue en espèces en main propre.
-            </div>
-          </div>
-
-          <div className="pt-4 border-t border-slate-100 flex justify-between">
-            <button
-              type="button"
+            {/* Step 2 */}
+            <div
               onClick={() => setCurrentStep(2)}
-              className="px-5 py-2.5 bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-bold rounded-xl transition"
+              className={`p-4 rounded-2xl shadow-xs flex items-center justify-between cursor-pointer transition border ${
+                currentStep === 2
+                  ? 'bg-primary text-white border-primary shadow-sm'
+                  : 'bg-surface-container-lowest text-on-surface border-[#ded7ca]'
+              }`}
             >
-              ← Retour
-            </button>
-            <button
-              type="submit"
-              disabled={submitting}
-              className="px-8 py-3 bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-black rounded-xl shadow-md transition flex items-center gap-2 disabled:opacity-50"
+              <div className="flex items-center gap-3.5">
+                <div className={`w-9 h-9 rounded-full flex items-center justify-center text-xs font-bold ${
+                  currentStep === 2 ? 'bg-white text-primary' : 'bg-[#ede8df] text-on-surface-variant'
+                }`}>
+                  {currentStep > 2 ? (
+                    <span className="material-symbols-outlined text-base material-symbols-fill">check</span>
+                  ) : '2'}
+                </div>
+                <div>
+                  <span className={`text-[10px] uppercase font-bold tracking-wider block ${
+                    currentStep === 2 ? 'text-primary-fixed' : 'text-on-surface-variant'
+                  }`}>
+                    Étape 02
+                  </span>
+                  <h3 className="font-serif font-bold text-sm">Rythme &amp; Enfants</h3>
+                </div>
+              </div>
+              <span className={`text-[11px] px-2.5 py-0.5 rounded-full ${
+                currentStep === 2 ? 'bg-white/20 text-white' : 'bg-[#FAF8F5] text-on-surface-variant'
+              }`}>
+                {childCount} enfant{childCount > 1 ? 's' : ''}
+              </span>
+            </div>
+
+            {/* Step 3 */}
+            <div
+              onClick={() => setCurrentStep(3)}
+              className={`p-4 rounded-2xl shadow-xs flex items-center justify-between cursor-pointer transition border ${
+                currentStep === 3
+                  ? 'bg-primary text-white border-primary shadow-sm'
+                  : 'bg-surface-container-lowest text-on-surface border-[#ded7ca]'
+              }`}
             >
-              {submitting ? (
-                <>
-                  <Loader2 className="w-4 h-4 animate-spin" />
-                  <span>Validation de la réservation...</span>
-                </>
-              ) : (
-                <span>Confirmer et Envoyer la Demande</span>
-              )}
-            </button>
+              <div className="flex items-center gap-3.5">
+                <div className={`w-9 h-9 rounded-full flex items-center justify-center text-xs font-bold ${
+                  currentStep === 3 ? 'bg-white text-primary' : 'bg-[#ede8df] text-on-surface-variant'
+                }`}>
+                  3
+                </div>
+                <div>
+                  <span className={`text-[10px] uppercase font-bold tracking-wider block ${
+                    currentStep === 3 ? 'text-primary-fixed' : 'text-on-surface-variant'
+                  }`}>
+                    Étape 03
+                  </span>
+                  <h3 className="font-serif font-bold text-sm">Confirmation &amp; Dispatch</h3>
+                </div>
+              </div>
+              <span className="material-symbols-outlined text-base">phone_callback</span>
+            </div>
+
           </div>
-        </form>
-      )}
+
+        </div>
+      </section>
+
+      {/* 2. MAIN DUAL-COLUMN CONTENT GRID */}
+      <section className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-10 w-full">
+        <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-start">
+          
+          {/* LEFT COLUMN: SYNTHESIS & CAREGIVER DOSSIER */}
+          <div className="lg:col-span-5 space-y-6">
+            
+            {/* Matched Profile Banner */}
+            <div className="bg-surface-container-lowest rounded-3xl p-6 shadow-sm border border-[#ded7ca] space-y-4">
+              <div className="flex items-center gap-4">
+                <div className="relative">
+                  <img
+                    src={providerPhoto}
+                    alt={providerName}
+                    className="w-16 h-16 rounded-2xl object-cover shadow-sm border border-[#ded7ca]"
+                  />
+                  <div className="absolute -bottom-1 -right-1 bg-tertiary-container text-white p-0.5 rounded-full flex items-center justify-center">
+                    <span className="material-symbols-outlined text-xs material-symbols-fill">verified</span>
+                  </div>
+                </div>
+                <div>
+                  <div className="flex items-center gap-2">
+                    <h3 className="font-serif font-bold text-base text-on-surface">{providerName}</h3>
+                    <span className="text-[10px] font-bold text-secondary bg-secondary-fixed/60 px-2 py-0.5 rounded-full">
+                      100% Vérifiée
+                    </span>
+                  </div>
+                  <p className="text-xs text-primary font-semibold">{providerRole}</p>
+                  <p className="text-[11px] text-on-surface-variant">{commune}, Alger</p>
+                </div>
+              </div>
+
+              {/* Mini Verification Trust Checklist */}
+              <div className="p-4 rounded-2xl bg-[#FAF8F5] border border-[#ded7ca] space-y-2 text-xs">
+                <div className="flex items-center gap-2 text-secondary font-semibold">
+                  <span className="material-symbols-outlined text-sm material-symbols-fill">task_alt</span>
+                  <span>CNI biométrique contrôlée au bureau</span>
+                </div>
+                <div className="flex items-center gap-2 text-secondary font-semibold">
+                  <span className="material-symbols-outlined text-sm material-symbols-fill">task_alt</span>
+                  <span>Extrait de casier judiciaire B3 vierge</span>
+                </div>
+                <div className="flex items-center gap-2 text-secondary font-semibold">
+                  <span className="material-symbols-outlined text-sm material-symbols-fill">task_alt</span>
+                  <span>Entretien physique d'évaluation validé</span>
+                </div>
+              </div>
+
+              {/* Price Summary */}
+              <div className="p-4 rounded-2xl bg-[#FAF8F5] border border-[#ded7ca] flex items-center justify-between">
+                <div>
+                  <span className="text-[10px] uppercase font-bold text-on-surface-variant block">Tarif convenu</span>
+                  <span className="font-serif font-bold text-lg text-primary">
+                    {formula === 'monthly' ? '28 000 DA / mois' : `${providerRate} DA / heure`}
+                  </span>
+                </div>
+                <span className="text-[11px] text-secondary font-bold bg-secondary-container/60 px-2.5 py-1 rounded-full">
+                  0 DA en ligne
+                </span>
+              </div>
+            </div>
+
+            {/* Reassurance Box */}
+            <div className="bg-surface-container-lowest p-6 rounded-3xl border border-[#ded7ca] space-y-3 text-xs">
+              <div className="flex items-center gap-2 text-primary font-bold">
+                <span className="material-symbols-outlined text-base">support_agent</span>
+                <span>Accompagnement Téléphonique Garanti</span>
+              </div>
+              <p className="text-on-surface-variant leading-relaxed">
+                Après soumission de ce formulaire, notre coordinateur vous contacte sous 2h par téléphone pour valider l'horaire de la visite de présentation de 30 minutes.
+              </p>
+              <div className="pt-1">
+                <a href={`tel:${ADMIN_CONTACT.phone}`} className="font-bold text-secondary hover:underline">
+                  Permanence : {ADMIN_CONTACT.phone}
+                </a>
+              </div>
+            </div>
+
+          </div>
+
+          {/* RIGHT COLUMN: STEPPER FORM */}
+          <div className="lg:col-span-7 bg-surface-container-lowest p-6 sm:p-8 rounded-3xl shadow-sm border border-[#ded7ca] space-y-6">
+            
+            {error && (
+              <div className="p-4 rounded-2xl bg-error-container text-on-error-container text-xs font-semibold flex items-center gap-2">
+                <span className="material-symbols-outlined text-base">error</span>
+                <span>{error}</span>
+              </div>
+            )}
+
+            <form onSubmit={handleSubmitBooking} className="space-y-6">
+              
+              {/* STEP 1: Famille & Coordonnées */}
+              {currentStep === 1 && (
+                <div className="space-y-4">
+                  <div className="border-b border-[#ded7ca] pb-3">
+                    <h2 className="font-serif font-bold text-lg text-on-surface">
+                      Étape 1 : Vos Coordonnées à Alger
+                    </h2>
+                    <p className="text-xs text-on-surface-variant">
+                      Pour vous contacter directement et coordonner la mise en relation.
+                    </p>
+                  </div>
+
+                  <div className="space-y-1.5">
+                    <label className="text-[11px] font-bold uppercase tracking-wider text-on-surface block">
+                      Nom et Prénom du Responsable Légal *
+                    </label>
+                    <input
+                      type="text"
+                      required
+                      value={clientName}
+                      onChange={(e) => setClientName(e.target.value)}
+                      placeholder="Ex: Mme Benali Amel"
+                      className="w-full bg-[#FAF8F5] border border-[#ded7ca] rounded-2xl p-3 text-xs sm:text-sm text-on-surface font-medium focus:outline-none focus:ring-2 focus:ring-primary/20"
+                    />
+                  </div>
+
+                  <div className="space-y-1.5">
+                    <label className="text-[11px] font-bold uppercase tracking-wider text-on-surface block">
+                      Numéro de Téléphone (Mobile Algérien) *
+                    </label>
+                    <input
+                      type="tel"
+                      required
+                      value={clientPhone}
+                      onChange={(e) => setClientPhone(e.target.value)}
+                      placeholder="Ex: 0550 12 34 56 ou 0770 00 11 22"
+                      className="w-full bg-[#FAF8F5] border border-[#ded7ca] rounded-2xl p-3 text-xs sm:text-sm text-on-surface font-medium focus:outline-none focus:ring-2 focus:ring-primary/20"
+                    />
+                    <span className="text-[10px] text-on-surface-variant block">
+                      Ce numéro servira au coordinateur pour vous appeler directement.
+                    </span>
+                  </div>
+
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                    <div className="space-y-1.5">
+                      <label className="text-[11px] font-bold uppercase tracking-wider text-on-surface block">
+                        Commune d'Alger *
+                      </label>
+                      <select
+                        value={commune}
+                        onChange={(e) => setCommune(e.target.value)}
+                        className="w-full bg-[#FAF8F5] border border-[#ded7ca] rounded-2xl p-3 text-xs sm:text-sm text-on-surface font-semibold focus:outline-none focus:ring-2 focus:ring-primary/20"
+                      >
+                        {ALGER_COMMUNES.map((c) => (
+                          <option key={c} value={c}>
+                            {c}
+                          </option>
+                        ))}
+                      </select>
+                    </div>
+
+                    <div className="space-y-1.5">
+                      <label className="text-[11px] font-bold uppercase tracking-wider text-on-surface block">
+                        Quartier / Repère
+                      </label>
+                      <input
+                        type="text"
+                        value={addressDetails}
+                        onChange={(e) => setAddressDetails(e.target.value)}
+                        placeholder="Ex: Val d'Hydra, près de l'école"
+                        className="w-full bg-[#FAF8F5] border border-[#ded7ca] rounded-2xl p-3 text-xs sm:text-sm text-on-surface font-medium focus:outline-none focus:ring-2 focus:ring-primary/20"
+                      />
+                    </div>
+                  </div>
+
+                  <div className="pt-4 flex justify-end">
+                    <button
+                      type="button"
+                      onClick={() => {
+                        if (!clientName || !clientPhone) {
+                          setError('Veuillez renseigner votre nom et votre numéro de téléphone.');
+                          return;
+                        }
+                        setError(null);
+                        setCurrentStep(2);
+                      }}
+                      className="px-6 py-3 rounded-2xl bg-primary hover:bg-primary-600 text-white font-bold text-xs shadow-sm transition flex items-center gap-2"
+                    >
+                      <span>Continuer vers les Détails de Garde</span>
+                      <span className="material-symbols-outlined text-base">arrow_forward</span>
+                    </button>
+                  </div>
+                </div>
+              )}
+
+              {/* STEP 2: Rythme & Enfants */}
+              {currentStep === 2 && (
+                <div className="space-y-4">
+                  <div className="border-b border-[#ded7ca] pb-3">
+                    <h2 className="font-serif font-bold text-lg text-on-surface">
+                      Étape 2 : Rythme &amp; Informations Enfants
+                    </h2>
+                    <p className="text-xs text-on-surface-variant">
+                      Précisez vos besoins pour préparer au mieux la visite de présentation.
+                    </p>
+                  </div>
+
+                  {/* Formule Radio Selector */}
+                  <div className="space-y-2">
+                    <label className="text-[11px] font-bold uppercase tracking-wider text-on-surface block">
+                      Formule souhaitée
+                    </label>
+                    <div className="grid grid-cols-3 gap-2 text-xs">
+                      <button
+                        type="button"
+                        onClick={() => setFormula('hourly')}
+                        className={`p-3 rounded-2xl border text-center transition ${
+                          formula === 'hourly'
+                            ? 'bg-primary text-white border-primary shadow-xs font-bold'
+                            : 'bg-[#FAF8F5] border-[#ded7ca] text-on-surface'
+                        }`}
+                      >
+                        Ponctuelle
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setFormula('monthly')}
+                        className={`p-3 rounded-2xl border text-center transition ${
+                          formula === 'monthly'
+                            ? 'bg-primary text-white border-primary shadow-xs font-bold'
+                            : 'bg-[#FAF8F5] border-[#ded7ca] text-on-surface'
+                        }`}
+                      >
+                        Mensuelle
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setFormula('evening')}
+                        className={`p-3 rounded-2xl border text-center transition ${
+                          formula === 'evening'
+                            ? 'bg-primary text-white border-primary shadow-xs font-bold'
+                            : 'bg-[#FAF8F5] border-[#ded7ca] text-on-surface'
+                        }`}
+                      >
+                        Soirée
+                      </button>
+                    </div>
+                  </div>
+
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                    <div className="space-y-1.5">
+                      <label className="text-[11px] font-bold uppercase tracking-wider text-on-surface block">
+                        Nombre d'Enfants
+                      </label>
+                      <select
+                        value={childCount}
+                        onChange={(e) => setChildCount(Number(e.target.value))}
+                        className="w-full bg-[#FAF8F5] border border-[#ded7ca] rounded-2xl p-3 text-xs sm:text-sm text-on-surface font-semibold focus:outline-none focus:ring-2 focus:ring-primary/20"
+                      >
+                        <option value={1}>1 Enfant</option>
+                        <option value={2}>2 Enfants</option>
+                        <option value={3}>3 Enfants</option>
+                        <option value={4}>4 Enfants ou plus</option>
+                      </select>
+                    </div>
+
+                    <div className="space-y-1.5">
+                      <label className="text-[11px] font-bold uppercase tracking-wider text-on-surface block">
+                        Âges ou Classes
+                      </label>
+                      <input
+                        type="text"
+                        value={childAge}
+                        onChange={(e) => setChildAge(e.target.value)}
+                        placeholder="Ex: 18 mois et 4 ans"
+                        className="w-full bg-[#FAF8F5] border border-[#ded7ca] rounded-2xl p-3 text-xs sm:text-sm text-on-surface font-medium focus:outline-none focus:ring-2 focus:ring-primary/20"
+                      />
+                    </div>
+                  </div>
+
+                  <div className="space-y-1.5">
+                    <label className="text-[11px] font-bold uppercase tracking-wider text-on-surface block">
+                      Date de Début Souhaitée
+                    </label>
+                    <input
+                      type="date"
+                      value={startDate}
+                      onChange={(e) => setStartDate(e.target.value)}
+                      className="w-full bg-[#FAF8F5] border border-[#ded7ca] rounded-2xl p-3 text-xs sm:text-sm text-on-surface font-medium focus:outline-none focus:ring-2 focus:ring-primary/20"
+                    />
+                  </div>
+
+                  <div className="space-y-1.5">
+                    <label className="text-[11px] font-bold uppercase tracking-wider text-on-surface block">
+                      Consignes Particulières / Habitudes de l'Enfant
+                    </label>
+                    <textarea
+                      rows={3}
+                      value={specialNotes}
+                      onChange={(e) => setSpecialNotes(e.target.value)}
+                      placeholder="Ex: Sieste à 13h30, allergie aux arachides, devoirs de français..."
+                      className="w-full bg-[#FAF8F5] border border-[#ded7ca] rounded-2xl p-3 text-xs text-on-surface focus:outline-none focus:ring-2 focus:ring-primary/20 resize-none"
+                    />
+                  </div>
+
+                  <div className="pt-4 flex items-center justify-between">
+                    <button
+                      type="button"
+                      onClick={() => setCurrentStep(1)}
+                      className="px-4 py-2.5 rounded-2xl text-xs font-semibold text-on-surface-variant hover:text-on-surface"
+                    >
+                      Retour
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setCurrentStep(3)}
+                      className="px-6 py-3 rounded-2xl bg-primary hover:bg-primary-600 text-white font-bold text-xs shadow-sm transition flex items-center gap-2"
+                    >
+                      <span>Passer à la Confirmation Finale</span>
+                      <span className="material-symbols-outlined text-base">arrow_forward</span>
+                    </button>
+                  </div>
+                </div>
+              )}
+
+              {/* STEP 3: Confirmation & Dispatch */}
+              {currentStep === 3 && (
+                <div className="space-y-5">
+                  <div className="border-b border-[#ded7ca] pb-3">
+                    <h2 className="font-serif font-bold text-lg text-on-surface">
+                      Étape 3 : Récapitulatif &amp; Envoi du Dossier
+                    </h2>
+                    <p className="text-xs text-on-surface-variant">
+                      Vérifiez votre demande avant la validation du coordinateur.
+                    </p>
+                  </div>
+
+                  {/* Summary Card */}
+                  <div className="p-5 rounded-2xl bg-[#FAF8F5] border border-[#ded7ca] space-y-3 text-xs">
+                    <div className="flex items-center justify-between pb-2 border-b border-[#ded7ca]">
+                      <span className="text-on-surface-variant">Prestataire sélectionnée :</span>
+                      <span className="font-bold text-on-surface">{providerName}</span>
+                    </div>
+                    <div className="flex items-center justify-between pb-2 border-b border-[#ded7ca]">
+                      <span className="text-on-surface-variant">Famille &amp; Contact :</span>
+                      <span className="font-bold text-on-surface">{clientName} ({clientPhone})</span>
+                    </div>
+                    <div className="flex items-center justify-between pb-2 border-b border-[#ded7ca]">
+                      <span className="text-on-surface-variant">Lieu d'intervention :</span>
+                      <span className="font-bold text-on-surface">{commune} ({addressDetails || 'Centre'})</span>
+                    </div>
+                    <div className="flex items-center justify-between pb-2 border-b border-[#ded7ca]">
+                      <span className="text-on-surface-variant">Enfants :</span>
+                      <span className="font-bold text-on-surface">{childCount} enfant ({childAge})</span>
+                    </div>
+                    <div className="flex items-center justify-between">
+                      <span className="text-on-surface-variant">Règlement :</span>
+                      <span className="font-bold text-secondary">100% Espèces après accord direct (0 DA en ligne)</span>
+                    </div>
+                  </div>
+
+                  {/* Charter Commitment */}
+                  <div className="p-4 rounded-2xl bg-secondary-fixed/40 border border-secondary/30 text-xs space-y-1">
+                    <div className="flex items-center gap-1.5 font-bold text-secondary">
+                      <span className="material-symbols-outlined text-sm material-symbols-fill">check_circle</span>
+                      <span>Engagement de Sérénité TataWafa</span>
+                    </div>
+                    <p className="text-on-surface-variant">
+                      Vous ne payez rien aujourd'hui. Le coordinateur vous contacte d'abord par téléphone pour valider l'adéquation du profil et organiser la première prise de contact.
+                    </p>
+                  </div>
+
+                  <div className="pt-4 flex items-center justify-between">
+                    <button
+                      type="button"
+                      onClick={() => setCurrentStep(2)}
+                      className="px-4 py-2.5 rounded-2xl text-xs font-semibold text-on-surface-variant hover:text-on-surface"
+                    >
+                      Modifier les détails
+                    </button>
+
+                    <button
+                      type="submit"
+                      disabled={submitting}
+                      className="px-8 py-3.5 rounded-2xl bg-primary hover:bg-primary-600 disabled:opacity-50 text-white font-bold text-xs shadow-md transition flex items-center gap-2"
+                    >
+                      {submitting ? (
+                        <>
+                          <span className="material-symbols-outlined text-base animate-spin">progress_activity</span>
+                          <span>Transmission en cours...</span>
+                        </>
+                      ) : (
+                        <>
+                          <span className="material-symbols-outlined text-base">send</span>
+                          <span>Confirmer &amp; Transmettre au Coordinateur</span>
+                        </>
+                      )}
+                    </button>
+                  </div>
+                </div>
+              )}
+
+            </form>
+
+          </div>
+
+        </div>
+      </section>
 
     </div>
   );

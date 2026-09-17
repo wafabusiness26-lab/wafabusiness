@@ -6,8 +6,8 @@ import { Navbar } from '@/components/Navbar';
 import { Footer } from '@/components/Footer';
 
 export const metadata: Metadata = {
-  title: 'TataWafa — Services de Garde d\'Enfants & Soutien Scolaire à Alger',
-  description: 'Plateforme de confiance pour trouver des babysitters, nounous et enseignants à Alger. Coordination téléphonique et vérification des pièces en main propre.',
+  title: "TataWafa — Garde d'Enfants & Soutien Scolaire Vérifiés en Main Propre à Alger",
+  description: "Plateforme humaine à Alger. 100% Vérification physique au bureau, 0 document sur Internet, 0 DA en ligne (règlement espèces direct), coordination téléphonique humaine.",
 };
 
 export default function RootLayout({
@@ -17,11 +17,11 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="fr" className="h-full">
-      <body className="flex min-h-full flex-col bg-slate-50 text-slate-900 antialiased selection:bg-indigo-500 selection:text-white">
+      <body className="flex min-h-full flex-col bg-[#FAF8F5] text-on-surface antialiased selection:bg-primary-fixed selection:text-on-primary-fixed">
         <AuthProvider>
           {process.env.NODE_ENV === 'development' && <RoleSwitcher />}
           <Navbar />
-          <main className="flex-1">
+          <main className="flex-1 pt-28">
             {children}
           </main>
           <Footer />

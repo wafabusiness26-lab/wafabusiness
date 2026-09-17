@@ -5,20 +5,7 @@ import { useParams } from 'next/navigation';
 import Link from 'next/link';
 import { ServiceRequest } from '@/types';
 import { DataStore } from '@/lib/store';
-import { TimelineTracker } from '@/components/TimelineTracker';
-import { AdminCallCard } from '@/components/AdminCallCard';
-import { formatDate, formatPrice, ADMIN_PHONE } from '@/lib/utils';
-import { 
-  CheckCircle2, 
-  PhoneCall, 
-  Calendar, 
-  MapPin, 
-  ShieldCheck, 
-  ArrowRight, 
-  Printer, 
-  Loader2,
-  Clock
-} from 'lucide-react';
+import { ADMIN_CONTACT } from '@/lib/constants';
 
 export default function BookingConfirmationPage() {
   const params = useParams();
@@ -28,7 +15,7 @@ export default function BookingConfirmationPage() {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    const loadRequest = async () => {
+    async function loadRequest() {
       if (!id) return;
       setLoading(true);
       try {
@@ -39,121 +26,139 @@ export default function BookingConfirmationPage() {
       } finally {
         setLoading(false);
       }
-    };
+    }
     loadRequest();
   }, [id]);
 
   if (loading) {
     return (
-      <div className="min-h-[60vh] flex flex-col items-center justify-center text-slate-400 space-y-3">
-        <Loader2 className="w-8 h-8 animate-spin text-indigo-600" />
-        <p className="text-sm font-medium">Chargement de votre confirmation de réservation...</p>
+      <div className="min-h-[60vh] flex flex-col items-center justify-center space-y-3">
+        <span className="material-symbols-outlined text-3xl text-primary animate-spin">
+          progress_activity
+        </span>
+        <p className="text-xs text-on-surface-variant">Chargement du bon de confirmation...</p>
       </div>
     );
   }
 
-  if (!request) {
-    return (
-      <div className="max-w-md mx-auto py-20 px-4 text-center space-y-4">
-        <h2 className="text-2xl font-bold text-slate-900">Réservation introuvable</h2>
-        <Link href="/" className="text-xs font-bold text-indigo-600 hover:underline">
-          Retour à l'accueil
-        </Link>
-      </div>
-    );
-  }
+  const dossierCode = id ? `TW-ALG-${id.slice(-4).toUpperCase()}` : 'TW-ALG-4098';
 
   return (
-    <div className="max-w-3xl mx-auto px-4 sm:px-6 lg:px-8 py-10 space-y-8">
-      
-      {/* Carte Principale de Succès */}
-      <div className="bg-white rounded-3xl border border-emerald-200 p-6 sm:p-10 shadow-lg text-center space-y-6">
+    <div className="w-full bg-[#FAF8F5] min-h-screen py-10 px-4 sm:px-6 lg:px-8">
+      <div className="max-w-3xl mx-auto space-y-8">
         
-        <div className="w-20 h-20 bg-emerald-100 text-emerald-600 rounded-3xl flex items-center justify-center mx-auto shadow-inner">
-          <CheckCircle2 className="w-12 h-12" />
-        </div>
+        {/* Main Confirmation Sanctuary Card */}
+        <div className="bg-surface-container-lowest rounded-3xl p-8 sm:p-12 shadow-sm border border-[#ded7ca] text-center space-y-6 relative overflow-hidden">
+          <div className="absolute -top-10 -right-10 w-44 h-44 rounded-full bg-secondary-fixed/40 blur-2xl pointer-events-none"></div>
 
-        <div className="space-y-2">
-          <span className="text-xs font-extrabold uppercase tracking-wider text-emerald-700 bg-emerald-50 px-3 py-1 rounded-full border border-emerald-200">
-            Dossier #{request.id.slice(-6).toUpperCase()} Enregistré
-          </span>
-          <h1 className="text-2xl sm:text-3xl font-black text-slate-900 tracking-tight">
-            Demande de Réservation Transmise !
-          </h1>
-          <p className="text-xs sm:text-sm text-slate-600 max-w-lg mx-auto leading-relaxed">
-            Votre demande pour <strong>{request.listing?.title}</strong> est désormais entre les mains de notre équipe de coordination à Alger.
-          </p>
-        </div>
+          {/* Success Animated Icon */}
+          <div className="w-20 h-20 bg-secondary-fixed text-secondary rounded-3xl flex items-center justify-center mx-auto shadow-xs">
+            <span className="material-symbols-outlined text-4xl material-symbols-fill">task_alt</span>
+          </div>
 
-        {/* Timeline du processus */}
-        <div className="text-left">
-          <TimelineTracker status={request.status} />
-        </div>
-
-        {/* Récapitulatif du rendez-vous */}
-        <div className="bg-slate-50 border border-slate-200 rounded-2xl p-5 text-left space-y-3 text-xs">
-          <h4 className="font-bold text-slate-900 uppercase tracking-wider text-[11px]">
-            Détails de l'intervention demandée
-          </h4>
-
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-slate-700">
-            <div>
-              <span className="text-slate-400 block">Prestataire sollicité</span>
-              <strong className="text-slate-900">{request.listing?.provider?.full_name || 'Prestataire TataWafa'}</strong>
+          <div className="space-y-2">
+            <div className="inline-flex items-center gap-2 px-3.5 py-1 rounded-full bg-[#fcf8ee] border border-[#D4A373] text-[#7d562d] text-xs font-bold">
+              <span className="material-symbols-outlined text-sm text-[#b7895b] material-symbols-fill">verified</span>
+              <span>Dossier Officiel {dossierCode} Enregistré</span>
             </div>
 
-            <div>
-              <span className="text-slate-400 block">Date & Heure convenues</span>
-              <strong className="text-slate-900">{formatDate(request.requested_datetime)}</strong>
-            </div>
+            <h1 className="font-serif text-2xl sm:text-4xl font-bold text-on-surface tracking-tight">
+              Demande Transmise avec Succès !
+            </h1>
 
-            <div>
-              <span className="text-slate-400 block">Lieu de prise en charge</span>
-              <strong className="text-slate-900">{request.address_details || request.listing?.location} (Alger)</strong>
-            </div>
+            <p className="text-xs sm:text-sm text-on-surface-variant max-w-lg mx-auto leading-relaxed">
+              Votre dossier de garde a bien été transmis à notre cellule de coordination d'Alger. Vous allez être recontacté sous 2 heures.
+            </p>
+          </div>
 
-            <div>
-              <span className="text-slate-400 block">Tarif indicatif</span>
-              <strong className="text-slate-900">
-                {request.listing?.price ? formatPrice(request.listing.price, request.listing.price_unit || 'séance') : 'Sur devis'} (Espèces)
-              </strong>
+          {/* Process Timeline */}
+          <div className="p-6 rounded-2xl bg-[#FAF8F5] border border-[#ded7ca] text-left space-y-4">
+            <h3 className="text-xs font-bold uppercase tracking-wider text-on-surface">
+              Prochaines étapes de votre prise en charge :
+            </h3>
+            
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 text-xs">
+              <div className="p-3 bg-white rounded-xl border border-secondary/30 space-y-1">
+                <span className="font-bold text-secondary flex items-center gap-1">
+                  <span className="material-symbols-outlined text-sm material-symbols-fill">check_circle</span>
+                  <span>1. Dossier Reçu</span>
+                </span>
+                <p className="text-[11px] text-on-surface-variant">Enregistré dans le système</p>
+              </div>
+
+              <div className="p-3 bg-white rounded-xl border border-primary/40 space-y-1">
+                <span className="font-bold text-primary flex items-center gap-1 animate-pulse">
+                  <span className="material-symbols-outlined text-sm">phone_in_talk</span>
+                  <span>2. Appel Coordinateur</span>
+                </span>
+                <p className="text-[11px] text-on-surface-variant">Sous 2h pour convenir de l'horaire</p>
+              </div>
+
+              <div className="p-3 bg-white rounded-xl border border-[#ded7ca] space-y-1">
+                <span className="font-bold text-on-surface flex items-center gap-1">
+                  <span className="material-symbols-outlined text-sm">handshake</span>
+                  <span>3. Visite &amp; Garde</span>
+                </span>
+                <p className="text-[11px] text-on-surface-variant">1ère rencontre gratuite à domicile</p>
+              </div>
             </div>
           </div>
 
-          {request.note && (
-            <div className="pt-2 border-t border-slate-200 text-slate-600">
-              <span className="font-semibold text-slate-800">Précisions indiquées : </span>
-              {request.note}
+          {/* Digital Voucher Recap */}
+          <div className="p-6 rounded-2xl bg-[#f4f1ea]/80 border border-[#ded7ca] text-left space-y-3 text-xs">
+            <div className="flex items-center justify-between pb-2 border-b border-[#ded7ca]">
+              <span className="text-on-surface-variant">Intervenante sélectionnée :</span>
+              <span className="font-bold text-on-surface">
+                {request?.listing?.title || 'Assistante Maternelle Certifiée'}
+              </span>
             </div>
-          )}
-        </div>
+            <div className="flex items-center justify-between pb-2 border-b border-[#ded7ca]">
+              <span className="text-on-surface-variant">Commune d'intervention :</span>
+              <span className="font-bold text-on-surface">{request?.address_details || 'Wilaya d\'Alger'}</span>
+            </div>
+            <div className="flex items-center justify-between pb-2 border-b border-[#ded7ca]">
+              <span className="text-on-surface-variant">Nombre d'enfants :</span>
+              <span className="font-bold text-on-surface">
+                {request?.child_count || 1} enfant ({request?.child_age_or_grade || '2 ans'})
+              </span>
+            </div>
+            <div className="flex items-center justify-between">
+              <span className="text-on-surface-variant">Mode de règlement convenu :</span>
+              <span className="font-bold text-secondary">100% Espèces de main à main (0 DA en ligne)</span>
+            </div>
+          </div>
 
-        {/* Carte de contact de l'administrateur */}
-        <AdminCallCard
-          title="Le coordinateur va vous appeler"
-          subtitle={`Vous recevrez un appel au ${request.client?.phone || 'votre numéro'} pour confirmer les détails. Vous pouvez également joindre l'administrateur directement.`}
-        />
+          {/* Quick Direct Actions */}
+          <div className="flex flex-col sm:flex-row items-center justify-center gap-4 pt-2">
+            <a
+              href={`tel:${ADMIN_CONTACT.phone}`}
+              className="w-full sm:w-auto px-6 py-3.5 rounded-2xl bg-secondary hover:bg-secondary-600 text-white font-bold text-xs shadow-sm transition flex items-center justify-center gap-2"
+            >
+              <span className="material-symbols-outlined text-base">call</span>
+              <span>Joindre le coordinateur ({ADMIN_CONTACT.phone})</span>
+            </a>
 
-        {/* Boutons d'action */}
-        <div className="pt-4 flex flex-col sm:flex-row justify-center gap-3">
-          <Link
-            href="/client/demandes"
-            className="px-6 py-3 bg-indigo-600 hover:bg-indigo-700 text-white font-bold text-xs rounded-xl shadow-md transition"
-          >
-            Suivre dans "Mes Demandes"
-          </Link>
-          <button
-            type="button"
-            onClick={() => window.print()}
-            className="px-5 py-3 bg-slate-100 hover:bg-slate-200 text-slate-700 font-semibold text-xs rounded-xl transition flex items-center justify-center gap-2"
-          >
-            <Printer className="w-4 h-4" />
-            <span>Imprimer le récapitulatif</span>
-          </button>
+            <Link
+              href="/client/demandes"
+              className="w-full sm:w-auto px-6 py-3.5 rounded-2xl bg-primary hover:bg-primary-600 text-white font-bold text-xs shadow-sm transition flex items-center justify-center gap-2"
+            >
+              <span className="material-symbols-outlined text-base">calendar_month</span>
+              <span>Suivre dans mon Espace Famille</span>
+            </Link>
+          </div>
+
+          <div className="pt-2">
+            <Link
+              href="/"
+              className="text-xs text-on-surface-variant hover:text-primary font-semibold transition"
+            >
+              ← Retour à l'accueil TataWafa
+            </Link>
+          </div>
+
         </div>
 
       </div>
-
     </div>
   );
 }

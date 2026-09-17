@@ -1,7 +1,6 @@
 import React from 'react';
 import { PriceUnit } from '@/types';
 import { formatPrice } from '@/lib/utils';
-import { Coins } from 'lucide-react';
 
 interface PriceTagProps {
   price: number;
@@ -19,20 +18,20 @@ export const PriceTag: React.FC<PriceTagProps> = ({
   const formatted = formatPrice(price, unit);
 
   const sizeClasses = {
-    sm: 'text-xs font-bold',
-    md: 'text-base font-extrabold',
-    lg: 'text-2xl sm:text-3xl font-black'
+    sm: 'text-xs font-bold text-primary',
+    md: 'text-base font-bold text-primary',
+    lg: 'text-2xl font-serif font-bold text-primary'
   };
 
   return (
     <div className="inline-flex flex-col items-start">
-      <div className={`text-slate-900 flex items-center gap-1.5 ${sizeClasses[size]}`}>
-        <Coins className="w-4 h-4 text-amber-500 shrink-0" />
+      <div className={`flex items-center gap-1.5 ${sizeClasses[size]}`}>
+        <span className="material-symbols-outlined text-[18px] text-tertiary material-symbols-fill">payments</span>
         <span>{formatted}</span>
       </div>
       {showCashBadge && (
-        <span className="text-[10px] font-semibold text-emerald-800 bg-emerald-50 px-2 py-0.5 rounded border border-emerald-200 mt-0.5">
-          Règlement en espèces sur place
+        <span className="text-[10px] font-bold text-secondary bg-secondary-fixed/60 px-2 py-0.5 rounded-full border border-secondary/30 mt-1">
+          100% Espèces directes (0 DA en ligne)
         </span>
       )}
     </div>
