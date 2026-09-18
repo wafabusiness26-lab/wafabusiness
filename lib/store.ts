@@ -24,7 +24,7 @@ const STORAGE_KEYS = {
   REVIEWS: 'tatawafa_reviews_v3',
 };
 
-// Nettoyage automatique de tout cache obsolète ou ancien mock
+// Nettoyage automatique de tout ancien cache obsolète de test
 if (typeof window !== 'undefined') {
   try {
     ['tatawafa_listings', 'tatawafa_listings_v1', 'tatawafa_listings_v2', 'tatawafa_profiles', 'tatawafa_profiles_v1', 'tatawafa_profiles_v2'].forEach(k => {
@@ -33,7 +33,7 @@ if (typeof window !== 'undefined') {
   } catch (_) {}
 }
 
-// Helper pour localStorage en mode test local
+// Helpers réservés EXCLUSIVEMENT au mode test local hors ligne (sans identifiants Supabase)
 function getLocal<T>(key: string, fallback: T): T {
   if (typeof window === 'undefined') return fallback;
   try {
@@ -72,6 +72,7 @@ export class DataStore {
       return (data || []) as Profile[];
     }
 
+    // MODE TEST LOCAL HORS LIGNE UNIQUEMENT
     const profiles = getLocal<Profile[]>(STORAGE_KEYS.PROFILES, INITIAL_PROFILES);
     return role ? profiles.filter(p => p.role === role) : profiles;
   }
@@ -88,6 +89,7 @@ export class DataStore {
       return data as Profile | null;
     }
 
+    // MODE TEST LOCAL HORS LIGNE UNIQUEMENT
     const profiles = getLocal<Profile[]>(STORAGE_KEYS.PROFILES, INITIAL_PROFILES);
     return profiles.find(p => p.id === id) || null;
   }
@@ -116,17 +118,18 @@ export class DataStore {
         try {
           const { data, error } = await supabase.from('profiles').upsert(updatedProfile).select().single();
           if (error) {
-            console.warn('Supabase saveProfile notice (handled by DB trigger):', error.message);
+            console.warn('Supabase saveProfile notice (DB trigger synchronization):', error.message);
           } else if (data) {
             return data as Profile;
           }
         } catch (e) {
-          console.warn('Supabase saveProfile exception (handled by DB trigger):', e);
+          console.warn('Supabase saveProfile exception (DB trigger synchronization):', e);
         }
-        return updatedProfile;
       }
+      return updatedProfile;
     }
 
+    // MODE TEST LOCAL HORS LIGNE UNIQUEMENT
     const profiles = getLocal<Profile[]>(STORAGE_KEYS.PROFILES, INITIAL_PROFILES);
     const index = profiles.findIndex(p => p.id === updatedProfile.id);
     let updatedList: Profile[];
@@ -166,50 +169,95 @@ export class DataStore {
     category?: string; 
     query?: string;
     commune?: string;
-    includeUnverified?: boolean; // Par défaut false : seules les annonces vérifiées en main propre apparaissent au public
+    includeUnverified?: boolean;
     maxPrice?: number;
   }): Promise<ServiceListing[]> {
+    if (isSupabaseConfigured()) {
+      const supabase = createClient();
+      if (!supabase) return [];
+
+      let q = supabase.from('service_listings').select(`
+        *,
+        provider:profiles(*)
+      `).order('created_at', { ascending: false });
+
+      if (filters?.category && filters.category !== 'all') {
+        q = q.eq('category', filters.category);
+      }
+
+      const { data, error } = await q;
+      if (error) {
+        console.error('Supabase getListings error:', error);
+        return [];
+      }
+
+      let listings = (data || []) as ServiceListing[];
+
+      // Règle stricte de vérification physique
+      if (!filters?.includeUnverified) {
+        listings = listings.filter(l => l.provider?.verification_status === 'verifie_en_main_propre');
+      }
+
+      if (filters?.commune && filters.commune !== 'all') {
+        const c = filters.commune.toLowerCase();
+        listings = listings.filter(l => 
+          (l.location && l.location.toLowerCase().includes(c)) ||
+          (l.supported_communes && l.supported_communes.some(sc => sc.toLowerCase().includes(c)))
+        );
+      }
+
+      if (filters?.query) {
+        const queryStr = filters.query.toLowerCase();
+        listings = listings.filter(l => 
+          l.title.toLowerCase().includes(queryStr) || 
+          (l.description && l.description.toLowerCase().includes(queryStr)) ||
+          (l.location && l.location.toLowerCase().includes(queryStr)) ||
+          (l.provider?.full_name && l.provider.full_name.toLowerCase().includes(queryStr))
+        );
+      }
+
+      if (filters?.maxPrice) {
+        listings = listings.filter(l => l.price <= (filters.maxPrice as number));
+      }
+
+      // Récupérer les avis pour calculer les moyennes
+      const reviews = await this.getAllReviews();
+      const requests = await this.getRequestsRaw();
+
+      return listings.map(item => {
+        const itemRequestIds = requests.filter(r => r.listing_id === item.id).map(r => r.id);
+        const itemReviews = reviews.filter(rev => itemRequestIds.includes(rev.request_id));
+        const ratingCount = itemReviews.length;
+        const avgRating = ratingCount > 0 
+          ? itemReviews.reduce((sum, r) => sum + r.rating, 0) / ratingCount 
+          : 0;
+
+        return {
+          ...item,
+          review_count: ratingCount,
+          average_rating: avgRating > 0 ? Number(avgRating.toFixed(1)) : undefined,
+        };
+      });
+    }
+
+    // MODE TEST LOCAL HORS LIGNE UNIQUEMENT
     const profiles = await this.getProfiles();
     const reviews = await this.getAllReviews();
     const requests = await this.getRequestsRaw();
 
-    let listings: ServiceListing[] = [];
-
-    if (isSupabaseConfigured()) {
-      const supabase = createClient();
-      if (supabase) {
-        let q = supabase.from('service_listings').select(`
-          *,
-          provider:profiles(*)
-        `).order('created_at', { ascending: false });
-
-        if (filters?.category && filters.category !== 'all') {
-          q = q.eq('category', filters.category);
-        }
-
-        const { data, error } = await q;
-        if (!error && data) {
-          listings = data as ServiceListing[];
-        }
+    let listings = getLocal<ServiceListing[]>(STORAGE_KEYS.LISTINGS, INITIAL_LISTINGS);
+    
+    listings = listings.map(item => ({
+      ...item,
+      provider: profiles.find(p => p.id === item.provider_id) || {
+        id: item.provider_id,
+        role: 'provider',
+        full_name: 'Prestataire TataWafa',
+        location: item.location,
+        verification_status: 'en_attente_physique',
       }
-    } else {
-      listings = getLocal<ServiceListing[]>(STORAGE_KEYS.LISTINGS, INITIAL_LISTINGS);
-      
-      // Joindre les profils
-      listings = listings.map(item => ({
-        ...item,
-        provider: profiles.find(p => p.id === item.provider_id) || {
-          id: item.provider_id,
-          role: 'provider',
-          full_name: 'Prestataire TataWafa',
-          location: item.location,
-          verification_status: 'en_attente_physique',
-        }
-      }));
-    }
+    }));
 
-    // RÈGLE DE CONFIANCE STRICTE :
-    // Par défaut, seules les annonces dont le prestataire a été vérifié en main propre sont retournées au public
     if (!filters?.includeUnverified) {
       listings = listings.filter(l => l.provider?.verification_status === 'verifie_en_main_propre');
     }
@@ -237,7 +285,6 @@ export class DataStore {
       listings = listings.filter(l => l.price <= (filters.maxPrice as number));
     }
 
-    // Calculer notes et avis
     return listings.map(item => {
       const itemRequestIds = requests.filter(r => r.listing_id === item.id).map(r => r.id);
       const itemReviews = reviews.filter(rev => itemRequestIds.includes(rev.request_id));
@@ -285,16 +332,16 @@ export class DataStore {
 
     if (isSupabaseConfigured()) {
       const supabase = createClient();
-      if (supabase) {
-        const { data, error } = await supabase.from('service_listings').upsert(completeListing).select().single();
-        if (error) {
-          console.error('Supabase saveListing error:', error);
-          throw error;
-        }
-        return data as ServiceListing;
+      if (!supabase) throw new Error('Client Supabase inaccessible.');
+      const { data, error } = await supabase.from('service_listings').upsert(completeListing).select().single();
+      if (error) {
+        console.error('Supabase saveListing error:', error);
+        throw error;
       }
+      return data as ServiceListing;
     }
 
+    // MODE TEST LOCAL HORS LIGNE UNIQUEMENT
     const listings = getLocal<ServiceListing[]>(STORAGE_KEYS.LISTINGS, INITIAL_LISTINGS);
     const idx = listings.findIndex(l => l.id === completeListing.id);
     let updated: ServiceListing[];
@@ -315,11 +362,17 @@ export class DataStore {
     if (isSupabaseConfigured()) {
       const supabase = createClient();
       if (supabase) {
-        const { data } = await supabase.from('requests').select('*');
+        const { data, error } = await supabase.from('requests').select('*');
+        if (error) {
+          console.error('Supabase getRequestsRaw error:', error);
+          return [];
+        }
         return (data || []) as ServiceRequest[];
       }
       return [];
     }
+
+    // MODE TEST LOCAL HORS LIGNE UNIQUEMENT
     return getLocal<ServiceRequest[]>(STORAGE_KEYS.REQUESTS, INITIAL_REQUESTS);
   }
 
@@ -350,6 +403,7 @@ export class DataStore {
       return (data || []) as ServiceRequest[];
     }
 
+    // MODE TEST LOCAL HORS LIGNE UNIQUEMENT
     const listings = await this.getListings();
     const profiles = await this.getProfiles();
     const reviews = await this.getAllReviews();
@@ -391,6 +445,30 @@ export class DataStore {
     address_details?: string;
     duration_hours?: number;
   }): Promise<ServiceRequest> {
+    if (isSupabaseConfigured()) {
+      const supabase = createClient();
+      if (!supabase) throw new Error('Client Supabase inaccessible.');
+
+      const { data: created, error } = await supabase.from('requests').insert({
+        client_id: data.client_id,
+        listing_id: data.listing_id,
+        requested_datetime: data.requested_datetime,
+        note: data.note,
+        status: 'new',
+        child_count: data.child_count || 1,
+        child_age_or_grade: data.child_age_or_grade,
+        address_details: data.address_details,
+        duration_hours: data.duration_hours,
+      }).select().single();
+
+      if (error) {
+        console.error('Supabase createRequest error:', error);
+        throw error;
+      }
+      return created as ServiceRequest;
+    }
+
+    // MODE TEST LOCAL HORS LIGNE UNIQUEMENT
     const newReq: ServiceRequest = {
       id: `req_${Date.now()}`,
       client_id: data.client_id,
@@ -405,29 +483,6 @@ export class DataStore {
       created_at: new Date().toISOString(),
     };
 
-    if (isSupabaseConfigured()) {
-      const supabase = createClient();
-      if (supabase) {
-        const { data: created, error } = await supabase.from('requests').insert({
-          client_id: data.client_id,
-          listing_id: data.listing_id,
-          requested_datetime: data.requested_datetime,
-          note: data.note,
-          status: 'new',
-          child_count: data.child_count || 1,
-          child_age_or_grade: data.child_age_or_grade,
-          address_details: data.address_details,
-          duration_hours: data.duration_hours,
-        }).select().single();
-
-        if (error) {
-          console.error('Supabase createRequest error:', error);
-          throw error;
-        }
-        return created as ServiceRequest;
-      }
-    }
-
     const current = getLocal<ServiceRequest[]>(STORAGE_KEYS.REQUESTS, INITIAL_REQUESTS);
     setLocal(STORAGE_KEYS.REQUESTS, [newReq, ...current]);
     return newReq;
@@ -436,17 +491,23 @@ export class DataStore {
   static async updateRequestStatus(requestId: string, status: RequestStatus, adminNotes?: string): Promise<boolean> {
     if (isSupabaseConfigured()) {
       const supabase = createClient();
-      if (supabase) {
-        const updatePayload: any = { status };
-        if (adminNotes !== undefined) updatePayload.admin_notes = adminNotes;
-        const { error } = await supabase
-          .from('requests')
-          .update(updatePayload)
-          .eq('id', requestId);
-        return !error;
+      if (!supabase) return false;
+
+      const updatePayload: any = { status };
+      if (adminNotes !== undefined) updatePayload.admin_notes = adminNotes;
+      const { error } = await supabase
+        .from('requests')
+        .update(updatePayload)
+        .eq('id', requestId);
+
+      if (error) {
+        console.error('Supabase updateRequestStatus error:', error);
+        return false;
       }
+      return true;
     }
 
+    // MODE TEST LOCAL HORS LIGNE UNIQUEMENT
     const current = getLocal<ServiceRequest[]>(STORAGE_KEYS.REQUESTS, INITIAL_REQUESTS);
     const index = current.findIndex(r => r.id === requestId);
     if (index >= 0) {
@@ -464,17 +525,52 @@ export class DataStore {
   static async getAllReviews(): Promise<Review[]> {
     if (isSupabaseConfigured()) {
       const supabase = createClient();
-      if (supabase) {
-        const { data, error } = await supabase.from('reviews').select('*');
-        if (error) return [];
-        return (data || []) as Review[];
+      if (!supabase) return [];
+
+      const { data, error } = await supabase.from('reviews').select('*');
+      if (error) {
+        console.error('Supabase getAllReviews error:', error);
+        return [];
       }
-      return [];
+      return (data || []) as Review[];
     }
+
+    // MODE TEST LOCAL HORS LIGNE UNIQUEMENT
     return getLocal<Review[]>(STORAGE_KEYS.REVIEWS, INITIAL_REVIEWS);
   }
 
   static async getReviewsForListing(listingId: string): Promise<Review[]> {
+    if (isSupabaseConfigured()) {
+      const supabase = createClient();
+      if (!supabase) return [];
+
+      const { data: reqs, error: reqsError } = await supabase.from('requests').select('id').eq('listing_id', listingId);
+      if (reqsError) {
+        console.error('Supabase getReviewsForListing reqs error:', reqsError);
+        return [];
+      }
+      const reqIds = (reqs || []).map(r => r.id);
+      if (reqIds.length === 0) return [];
+
+      const { data: revs, error: revsError } = await supabase.from('reviews').select(`
+        *,
+        request:requests(
+          client:profiles!requests_client_id_fkey(*)
+        )
+      `).in('request_id', reqIds).order('created_at', { ascending: false });
+
+      if (revsError) {
+        console.error('Supabase getReviewsForListing revs error:', revsError);
+        return [];
+      }
+
+      return (revs || []).map((r: any) => ({
+        ...r,
+        client: r.request?.client,
+      })) as Review[];
+    }
+
+    // MODE TEST LOCAL HORS LIGNE UNIQUEMENT
     const requests = await this.getRequestsRaw();
     const reviews = await this.getAllReviews();
     const profiles = await this.getProfiles();
@@ -493,6 +589,42 @@ export class DataStore {
   }
 
   static async getReviewsForProvider(providerId: string): Promise<Review[]> {
+    if (isSupabaseConfigured()) {
+      const supabase = createClient();
+      if (!supabase) return [];
+
+      // Annonces du prestataire
+      const listings = await this.getListings({ includeUnverified: true });
+      const providerListingIds = listings.filter(l => l.provider_id === providerId).map(l => l.id);
+      if (providerListingIds.length === 0) return [];
+
+      const { data: reqs, error: reqsError } = await supabase.from('requests').select('id').in('listing_id', providerListingIds);
+      if (reqsError) {
+        console.error('Supabase getReviewsForProvider reqs error:', reqsError);
+        return [];
+      }
+      const reqIds = (reqs || []).map(r => r.id);
+      if (reqIds.length === 0) return [];
+
+      const { data: revs, error: revsError } = await supabase.from('reviews').select(`
+        *,
+        request:requests(
+          client:profiles!requests_client_id_fkey(*)
+        )
+      `).in('request_id', reqIds).order('created_at', { ascending: false });
+
+      if (revsError) {
+        console.error('Supabase getReviewsForProvider revs error:', revsError);
+        return [];
+      }
+
+      return (revs || []).map((r: any) => ({
+        ...r,
+        client: r.request?.client,
+      })) as Review[];
+    }
+
+    // MODE TEST LOCAL HORS LIGNE UNIQUEMENT
     const listings = await this.getListings();
     const providerListingIds = listings.filter(l => l.provider_id === providerId).map(l => l.id);
     const requests = await this.getRequestsRaw();
@@ -521,21 +653,24 @@ export class DataStore {
   }): Promise<Review> {
     if (isSupabaseConfigured()) {
       const supabase = createClient();
-      if (supabase) {
-        const { data: created, error } = await supabase.from('reviews').insert({
-          request_id: data.request_id,
-          rating: data.rating,
-          comment: data.comment,
-        }).select().single();
+      if (!supabase) throw new Error('Client Supabase inaccessible.');
 
-        if (error) {
-          console.error('Supabase createReview error:', error);
-          throw error;
-        }
-        return created as Review;
+      const { data: created, error } = await supabase.from('reviews').insert({
+        request_id: data.request_id,
+        rating: data.rating,
+        punctuality_rating: data.punctuality_rating || data.rating,
+        competence_rating: data.competence_rating || data.rating,
+        comment: data.comment,
+      }).select().single();
+
+      if (error) {
+        console.error('Supabase createReview error:', error);
+        throw error;
       }
+      return created as Review;
     }
 
+    // MODE TEST LOCAL HORS LIGNE UNIQUEMENT
     const newReview: Review = {
       id: `rev_${Date.now()}`,
       request_id: data.request_id,
@@ -555,11 +690,17 @@ export class DataStore {
   static async deleteReview(reviewId: string): Promise<boolean> {
     if (isSupabaseConfigured()) {
       const supabase = createClient();
-      if (supabase) {
-        const { error } = await supabase.from('reviews').delete().eq('id', reviewId);
-        return !error;
+      if (!supabase) return false;
+
+      const { error } = await supabase.from('reviews').delete().eq('id', reviewId);
+      if (error) {
+        console.error('Supabase deleteReview error:', error);
+        return false;
       }
+      return true;
     }
+
+    // MODE TEST LOCAL HORS LIGNE UNIQUEMENT
     const current = getLocal<Review[]>(STORAGE_KEYS.REVIEWS, INITIAL_REVIEWS);
     setLocal(STORAGE_KEYS.REVIEWS, current.filter(r => r.id !== reviewId));
     return true;
@@ -582,17 +723,31 @@ export class DataStore {
 
     return reviews.map(rev => {
       const req = requestMap.get(rev.request_id);
-      const client = req ? profileMap.get(req.client_id) : undefined;
       const listing = req ? listingMap.get(req.listing_id) : undefined;
+      const client = req ? profileMap.get(req.client_id) : undefined;
       const provider = listing ? profileMap.get(listing.provider_id) : undefined;
 
       return {
         ...rev,
+        request: req,
+        listing,
         client,
         provider,
-        listing,
-        request: req,
       };
-    }).sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
+    });
+  }
+
+  // --------------------------------------------------------------------------
+  // RESET DATA HELPER (Uniquement disponible en mode test local hors ligne)
+  // --------------------------------------------------------------------------
+  static resetToDemoData() {
+    if (isSupabaseConfigured()) {
+      console.warn('Action interdite : la remise à zéro locale est désactivée lorsque Supabase est connecté.');
+      return;
+    }
+    setLocal(STORAGE_KEYS.PROFILES, INITIAL_PROFILES);
+    setLocal(STORAGE_KEYS.LISTINGS, INITIAL_LISTINGS);
+    setLocal(STORAGE_KEYS.REQUESTS, INITIAL_REQUESTS);
+    setLocal(STORAGE_KEYS.REVIEWS, INITIAL_REVIEWS);
   }
 }
