@@ -23,7 +23,7 @@ export default function ServiceDetailPage() {
       setLoading(true);
       try {
         const storeData = await DataStore.getListingById(id);
-        if (storeData) {
+        if (storeData && storeData.provider?.verification_status === 'verifie_en_main_propre') {
           setListing(storeData);
           const revs = await DataStore.getReviewsForListing(id);
           setReviews(revs);

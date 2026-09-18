@@ -308,7 +308,7 @@ export class DataStore {
     });
   }
 
-  static async getListingById(id: string, includeUnverified = true): Promise<ServiceListing | null> {
+  static async getListingById(id: string, includeUnverified = false): Promise<ServiceListing | null> {
     const all = await this.getListings({ includeUnverified });
     return all.find(l => l.id === id) || null;
   }

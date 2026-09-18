@@ -39,7 +39,7 @@ export default function BookServicePage() {
       setLoading(true);
       try {
         const data = await DataStore.getListingById(id);
-        if (data) {
+        if (data && data.provider?.verification_status === 'verifie_en_main_propre') {
           setListing(data);
           if (data.supported_communes?.[0]) setCommune(data.supported_communes[0]); else if (data.location) setCommune(data.location);
         } else {
@@ -102,6 +102,10 @@ export default function BookServicePage() {
 
   const handleSubmitBooking = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (!listing || listing.provider?.verification_status !== 'verifie_en_main_propre') {
+      setError("Ce prestataire n'a pas encore été vérifié en main propre par l'administration et ne peut recevoir de réservations.");
+      return;
+    }
     if (!clientName.trim() || !clientPhone.trim()) {
       setError('Veuillez renseigner votre nom et votre numéro de téléphone.');
       return;
