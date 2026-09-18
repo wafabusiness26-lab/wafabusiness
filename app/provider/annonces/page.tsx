@@ -51,7 +51,12 @@ export default function ProviderAnnoncesPage() {
       try {
         const existing = await DataStore.getProviderListing(providerId);
         if (existing) {
-          setListingId(existing.id);
+          const isRealUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(existing.id);
+          if (isRealUuid) {
+            setListingId(existing.id);
+          } else {
+            setListingId(null);
+          }
           setCategory(existing.category);
           setTitle(existing.title);
           setDescription(existing.description || '');

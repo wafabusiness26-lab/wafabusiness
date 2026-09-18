@@ -357,11 +357,20 @@ export class DataStore {
       };
 
       const isUuid = listing.id && /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(listing.id);
+      let data: any = null;
+      let error: any = null;
+
       if (isUuid) {
         payload.id = listing.id;
+        const res = await supabase.from('service_listings').update(payload).eq('id', listing.id).select().single();
+        data = res.data;
+        error = res.error;
+      } else {
+        const res = await supabase.from('service_listings').insert(payload).select().single();
+        data = res.data;
+        error = res.error;
       }
 
-      const { data, error } = await supabase.from('service_listings').upsert(payload).select().single();
       if (error) {
         console.error('Supabase saveListing error:', error);
         throw error;
