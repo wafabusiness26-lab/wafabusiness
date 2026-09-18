@@ -98,6 +98,22 @@ alter table public.requests add column if not exists address_details text;
 alter table public.requests add column if not exists duration_hours numeric default 2;
 alter table public.requests add column if not exists admin_notes text;
 
+-- Garantir la suppression en cascade (ON DELETE CASCADE) sur toutes les clés étrangères
+alter table public.profiles drop constraint if exists profiles_id_fkey;
+alter table public.profiles add constraint profiles_id_fkey foreign key (id) references auth.users(id) on delete cascade;
+
+alter table public.service_listings drop constraint if exists service_listings_provider_id_fkey;
+alter table public.service_listings add constraint service_listings_provider_id_fkey foreign key (provider_id) references public.profiles(id) on delete cascade;
+
+alter table public.requests drop constraint if exists requests_client_id_fkey;
+alter table public.requests add constraint requests_client_id_fkey foreign key (client_id) references public.profiles(id) on delete cascade;
+
+alter table public.requests drop constraint if exists requests_listing_id_fkey;
+alter table public.requests add constraint requests_listing_id_fkey foreign key (listing_id) references public.service_listings(id) on delete cascade;
+
+alter table public.reviews drop constraint if exists reviews_request_id_fkey;
+alter table public.reviews add constraint reviews_request_id_fkey foreign key (request_id) references public.requests(id) on delete cascade;
+
 -- ==============================================================================
 -- FONCTIONS DE SÉCURITÉ & TRIGGER ANTI-ESCALADE DE PRIVILÈGES
 -- ==============================================================================
