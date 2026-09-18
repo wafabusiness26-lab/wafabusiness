@@ -71,6 +71,33 @@ create table if not exists public.reviews (
   created_at timestamptz default now()
 );
 
+-- Synchronisation des colonnes existantes si la table a été créée précédemment
+alter table public.service_listings add column if not exists location text default 'Alger Centre';
+alter table public.service_listings add column if not exists supported_communes text[] default array['Alger Centre'];
+alter table public.service_listings add column if not exists price_unit text default 'séance';
+alter table public.service_listings add column if not exists availability text default 'Flexible';
+alter table public.service_listings add column if not exists photo_url text;
+alter table public.service_listings add column if not exists experience_years int default 2;
+alter table public.service_listings add column if not exists is_active boolean default true;
+
+alter table public.profiles add column if not exists location text default 'Alger Centre';
+alter table public.profiles add column if not exists phone text;
+alter table public.profiles add column if not exists avatar_url text;
+alter table public.profiles add column if not exists bio text;
+alter table public.profiles add column if not exists verification_status text default 'en_attente_physique';
+alter table public.profiles add column if not exists id_card_verified boolean default false;
+alter table public.profiles add column if not exists diploma_verified boolean default false;
+alter table public.profiles add column if not exists admin_verification_date timestamptz;
+alter table public.profiles add column if not exists admin_verification_notes text;
+
+alter table public.requests add column if not exists client_name text;
+alter table public.requests add column if not exists client_phone text;
+alter table public.requests add column if not exists child_count int default 1;
+alter table public.requests add column if not exists child_age_or_grade text;
+alter table public.requests add column if not exists address_details text;
+alter table public.requests add column if not exists duration_hours numeric default 2;
+alter table public.requests add column if not exists admin_notes text;
+
 -- ==============================================================================
 -- FONCTIONS DE SÉCURITÉ & TRIGGER ANTI-ESCALADE DE PRIVILÈGES
 -- ==============================================================================

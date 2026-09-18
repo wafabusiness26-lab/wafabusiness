@@ -340,7 +340,28 @@ export class DataStore {
     if (isSupabaseConfigured()) {
       const supabase = createClient();
       if (!supabase) throw new Error('Client Supabase inaccessible.');
-      const { data, error } = await supabase.from('service_listings').upsert(completeListing).select().single();
+
+      const payload: any = {
+        provider_id: completeListing.provider_id,
+        category: completeListing.category,
+        title: completeListing.title,
+        description: completeListing.description,
+        price: completeListing.price,
+        price_unit: completeListing.price_unit,
+        availability: completeListing.availability,
+        location: completeListing.location,
+        supported_communes: completeListing.supported_communes,
+        photo_url: completeListing.photo_url,
+        experience_years: completeListing.experience_years,
+        is_active: completeListing.is_active,
+      };
+
+      const isUuid = listing.id && /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(listing.id);
+      if (isUuid) {
+        payload.id = listing.id;
+      }
+
+      const { data, error } = await supabase.from('service_listings').upsert(payload).select().single();
       if (error) {
         console.error('Supabase saveListing error:', error);
         throw error;
