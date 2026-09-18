@@ -258,7 +258,7 @@ function ServicesDirectoryContent() {
                 className="flex items-center justify-center gap-2 w-full py-2.5 rounded-2xl bg-secondary-fixed/60 hover:bg-secondary-fixed text-on-secondary-fixed text-xs font-bold transition"
               >
                 <span className="material-symbols-outlined text-base">call</span>
-                <span>Besoin d'aide ? 0550 12 34 56</span>
+                <span>Besoin d'aide ? {ADMIN_CONTACT.phone}</span>
               </a>
             </div>
 

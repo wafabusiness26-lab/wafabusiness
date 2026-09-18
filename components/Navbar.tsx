@@ -220,7 +220,7 @@ export const Navbar: React.FC = () => {
           <div className="flex items-center gap-1.5 sm:gap-3 shrink-0">
             {/* Urgence Garde Direct Call Pill (visible from md and up) */}
             <a
-              href="tel:0550123456"
+              href={`tel:${ADMIN_CONTACT.phone}`}
               className="hidden md:flex items-center gap-2 bg-secondary-fixed/70 hover:bg-secondary-fixed text-on-secondary-fixed px-3.5 py-1.5 rounded-full shadow-[0_2px_6px_rgba(43,58,74,0.04)] border border-secondary-fixed-dim transition cursor-pointer"
             >
               <span className="material-symbols-outlined text-secondary text-[18px]">call</span>
@@ -229,7 +229,7 @@ export const Navbar: React.FC = () => {
                   Urgence Garde
                 </span>
                 <span className="text-[13px] font-bold leading-tight text-on-surface">
-                  0550 12 34 56
+                  {ADMIN_CONTACT.phone}
                 </span>
               </div>
             </a>
@@ -489,11 +489,11 @@ export const Navbar: React.FC = () => {
               {/* Direct Urgent Coordination Call */}
               <div className="pt-2 border-t border-[#ebdcd4]">
                 <a
-                  href="tel:0550123456"
+                  href={`tel:${ADMIN_CONTACT.phone}`}
                   className="flex items-center justify-center gap-2 w-full py-2.5 rounded-2xl bg-secondary text-white font-bold text-xs shadow-sm hover:bg-secondary-600 active:scale-98 transition"
                 >
                   <span className="material-symbols-outlined text-[17px]">call</span>
-                  <span>Permanence Directe : 0550 12 34 56</span>
+                  <span>Permanence Directe : {ADMIN_CONTACT.phone}</span>
                 </a>
               </div>
 

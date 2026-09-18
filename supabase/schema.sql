@@ -1,4 +1,4 @@
-﻿-- ==============================================================================
+-- ==============================================================================
 -- Plateforme TataWafa (Wilaya d'Alger, Algérie)
 -- Schéma PostgreSQL Supabase Hardened & Sécurisé (RLS Audité)
 -- ==============================================================================
@@ -122,7 +122,8 @@ create trigger on_auth_user_created
 create or replace function public.protect_profile_privileged_fields()
 returns trigger as $$
 begin
-  if not public.is_admin() then
+  -- Permettre les modifications directes via SQL Editor / Service Role (auth.uid() est null)
+  if auth.uid() is not null and not public.is_admin() then
     new.role := old.role;
     new.verification_status := old.verification_status;
     new.id_card_verified := old.id_card_verified;
