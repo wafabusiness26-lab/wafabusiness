@@ -116,14 +116,21 @@ export class DataStore {
       const supabase = createClient();
       if (supabase) {
         try {
-          const { data, error } = await supabase.from('profiles').upsert(updatedProfile).select().single();
+          const { id, created_at, ...fieldsToUpdate } = updatedProfile;
+          const { data, error } = await supabase
+            .from('profiles')
+            .update(fieldsToUpdate)
+            .eq('id', profile.id)
+            .select()
+            .single();
+
           if (error) {
-            console.warn('Supabase saveProfile notice (DB trigger synchronization):', error.message);
+            console.warn('Supabase update profile notice:', error.message);
           } else if (data) {
             return data as Profile;
           }
         } catch (e) {
-          console.warn('Supabase saveProfile exception (DB trigger synchronization):', e);
+          console.warn('Supabase update profile exception:', e);
         }
       }
       return updatedProfile;
