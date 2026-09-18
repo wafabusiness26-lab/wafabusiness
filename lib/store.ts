@@ -418,26 +418,58 @@ export class DataStore {
       const supabase = createClient();
       if (!supabase) return [];
 
-      let q = supabase.from('requests').select(`
-        *,
-        client:profiles!requests_client_id_fkey(*),
-        listing:service_listings!requests_listing_id_fkey(
+      try {
+        let q = supabase.from('requests').select(`
           *,
-          provider:profiles!service_listings_provider_id_fkey(*)
-        ),
-        review:reviews(*)
-      `).order('created_at', { ascending: false });
+          client:profiles(*),
+          listing:service_listings(
+            *,
+            provider:profiles(*)
+          ),
+          review:reviews(*)
+        `).order('created_at', { ascending: false });
 
-      if (options?.role === 'client' && options.userId) {
-        q = q.eq('client_id', options.userId);
+        if (options?.role === 'client' && options.userId) {
+          q = q.eq('client_id', options.userId);
+        }
+
+        const { data, error } = await q;
+        if (!error && data) {
+          return data as ServiceRequest[];
+        }
+        
+        console.warn('Supabase joined query notice, executing resilient fallback:', error?.message);
+      } catch (err) {
+        console.warn('Supabase query exception, using direct table query:', err);
       }
 
-      const { data, error } = await q;
-      if (error) {
-        console.error('Supabase getRequests error:', error);
+      // Robust fallback: direct query on requests table, then hydrate client and listing
+      try {
+        let directQ = supabase.from('requests').select('*').order('created_at', { ascending: false });
+        if (options?.role === 'client' && options.userId) {
+          directQ = directQ.eq('client_id', options.userId);
+        }
+
+        const { data: rawRequests, error: rawError } = await directQ;
+        if (rawError || !rawRequests) {
+          console.error('Supabase raw getRequests error:', rawError);
+          return [];
+        }
+
+        const [profiles, listings] = await Promise.all([
+          this.getProfiles(),
+          this.getListings({ includeUnverified: true }),
+        ]);
+
+        return rawRequests.map(r => ({
+          ...r,
+          client: profiles.find(p => p.id === r.client_id),
+          listing: listings.find(l => l.id === r.listing_id),
+        })) as ServiceRequest[];
+      } catch (e) {
+        console.error('Supabase getRequests fallback error:', e);
         return [];
       }
-      return (data || []) as ServiceRequest[];
     }
 
     // MODE TEST LOCAL HORS LIGNE UNIQUEMENT
@@ -486,17 +518,34 @@ export class DataStore {
       const supabase = createClient();
       if (!supabase) throw new Error('Client Supabase inaccessible.');
 
-      const { data: created, error } = await supabase.from('requests').insert({
+      const payload: any = {
         client_id: data.client_id,
         listing_id: data.listing_id,
         requested_datetime: data.requested_datetime,
         note: data.note,
         status: 'new',
-        child_count: data.child_count || 1,
-        child_age_or_grade: data.child_age_or_grade,
-        address_details: data.address_details,
-        duration_hours: data.duration_hours,
-      }).select().single();
+      };
+      if (data.child_count) payload.child_count = data.child_count;
+      if (data.child_age_or_grade) payload.child_age_or_grade = data.child_age_or_grade;
+      if (data.address_details) payload.address_details = data.address_details;
+      if (data.duration_hours) payload.duration_hours = data.duration_hours;
+
+      let { data: created, error } = await supabase.from('requests').insert(payload).select().single();
+
+      // En cas de colonne manquante dans l'ancien schéma Supabase, repli propre avec données dans le champ note
+      if (error && (error.message?.includes('column') || error.message?.includes('schema cache'))) {
+        console.warn('Repli création de demande (schéma minimal):', error.message);
+        const minimalPayload = {
+          client_id: data.client_id,
+          listing_id: data.listing_id,
+          requested_datetime: data.requested_datetime,
+          note: `${data.note || ''} (Enfants: ${data.child_count || 1} - ${data.child_age_or_grade || ''} | Adresse: ${data.address_details || ''})`,
+          status: 'new',
+        };
+        const retry = await supabase.from('requests').insert(minimalPayload).select().single();
+        created = retry.data;
+        error = retry.error;
+      }
 
       if (error) {
         console.error('Supabase createRequest error:', error);
