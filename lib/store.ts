@@ -18,16 +18,16 @@ import {
 import { createClient, isSupabaseConfigured } from './supabase/client';
 
 const STORAGE_KEYS = {
-  PROFILES: 'tatawafa_profiles_v3',
-  LISTINGS: 'tatawafa_listings_v3',
-  REQUESTS: 'tatawafa_requests_v3',
-  REVIEWS: 'tatawafa_reviews_v3',
+  PROFILES: 'tatawafa_profiles_v4',
+  LISTINGS: 'tatawafa_listings_v4',
+  REQUESTS: 'tatawafa_requests_v4',
+  REVIEWS: 'tatawafa_reviews_v4',
 };
 
 // Nettoyage automatique de tout ancien cache obsolète de test
 if (typeof window !== 'undefined') {
   try {
-    ['tatawafa_listings', 'tatawafa_listings_v1', 'tatawafa_listings_v2', 'tatawafa_profiles', 'tatawafa_profiles_v1', 'tatawafa_profiles_v2'].forEach(k => {
+    ['tatawafa_listings', 'tatawafa_listings_v1', 'tatawafa_listings_v2', 'tatawafa_listings_v3', 'tatawafa_profiles', 'tatawafa_profiles_v1', 'tatawafa_profiles_v2', 'tatawafa_profiles_v3', 'sm_listings', 'listings'].forEach(k => {
       localStorage.removeItem(k);
     });
   } catch (_) {}

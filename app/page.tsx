@@ -622,7 +622,7 @@ export default function HomePage() {
               },
               {
                 q: 'Que faire en cas d\'urgence ou de besoin immédiat ?',
-                a: 'Notre permanence téléphonique est joignable 7 jours sur 7 au 0550 12 34 56 ou via WhatsApp. Nous mobilisons une nounou disponible dans votre commune en moins de 3 heures.'
+                a: `Notre permanence téléphonique est joignable 7 jours sur 7 au ${ADMIN_CONTACT.phone} ou via WhatsApp. Nous mobilisons une nounou disponible dans votre commune en moins de 3 heures.`
               }
             ].map((faq, idx) => (
               <div

@@ -5,6 +5,7 @@ import { Profile, UserRole } from '@/types';
 import { DataStore } from './store';
 import { createClient, isSupabaseConfigured } from './supabase/client';
 import { INITIAL_PROFILES } from './mock-data';
+import { ADMIN_CONTACT } from './constants';
 
 interface AuthContextType {
   user: { id: string; email?: string } | null;
@@ -264,7 +265,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       id: newId,
       role: data.role,
       full_name: data.full_name,
-      phone: data.phone || '0550 12 34 56',
+      phone: data.phone || ADMIN_CONTACT.phone,
       location: data.location || 'Alger Centre',
       avatar_url: data.role === 'provider' 
         ? 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=150&auto=format&fit=crop&q=80'

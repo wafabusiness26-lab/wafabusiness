@@ -59,10 +59,10 @@ export type AlgerCommune = typeof ALGER_COMMUNES[number];
 
 export const ADMIN_CONTACT = {
   name: 'Coordination TataWafa Alger',
-  phone: '0550 12 34 56',
-  phoneDisplay: '+213 (0) 550 12 34 56',
-  whatsapp: 'https://wa.me/213550123456',
-  email: 'contact.tatawafa@gmail.com',
+  phone: '0782 37 43 37',
+  phoneDisplay: '+213 (0) 782 37 43 37',
+  whatsapp: 'https://wa.me/213782374337',
+  email: 'wafabusiness26@gmail.com',
   address: 'Didouche Mourad, Alger Centre, Wilaya d\'Alger',
   workingHours: '7j/7 de 08:00 à 21:00'
 };
@@ -161,6 +161,6 @@ export const FAQ_ITEMS = [
   },
   {
     q: 'Que faire en cas d\'imprévu ou de désistement ?',
-    a: 'Vous pouvez joindre immédiatement l\'administrateur par téléphone ou WhatsApp au 0550 12 34 56. Nous intervenons immédiatement pour réorganiser le planning ou vous proposer un autre prestataire qualifié.'
+    a: 'Vous pouvez joindre immédiatement l\'administrateur par téléphone ou WhatsApp au 0782 37 43 37. Nous intervenons immédiatement pour réorganiser le planning ou vous proposer un autre prestataire qualifié.'
   }
 ];
