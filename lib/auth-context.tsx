@@ -65,6 +65,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
                   created_at: new Date().toISOString(),
                 };
               }
+              const isOfficialAdmin = session.user.email?.toLowerCase() === ADMIN_CONTACT.email.toLowerCase();
+              if (isOfficialAdmin) {
+                p.role = 'admin';
+              }
               setProfile(p);
               setRole(p.role);
             }
@@ -75,6 +79,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
                 setUser({ id: session.user.id, email: session.user.email });
                 const p = await DataStore.getProfileById(session.user.id);
                 if (p) {
+                  const isOfficialAdmin = session.user.email?.toLowerCase() === ADMIN_CONTACT.email.toLowerCase();
+                  if (isOfficialAdmin) {
+                    p.role = 'admin';
+                  }
                   setProfile(p);
                   setRole(p.role);
                 }

@@ -107,6 +107,9 @@ create or replace function public.is_admin()
 returns boolean as $$
 begin
   return exists (
+    select 1 from auth.users
+    where id = auth.uid() and (email = 'wafabusiness26@gmail.com' or raw_user_meta_data->>'role' = 'admin')
+  ) or exists (
     select 1 from public.profiles
     where id = auth.uid() and role = 'admin'
   );
