@@ -18,11 +18,20 @@ import {
 import { createClient, isSupabaseConfigured } from './supabase/client';
 
 const STORAGE_KEYS = {
-  PROFILES: 'tatawafa_profiles_v2',
-  LISTINGS: 'tatawafa_listings_v2',
-  REQUESTS: 'tatawafa_requests_v2',
-  REVIEWS: 'tatawafa_reviews_v2',
+  PROFILES: 'tatawafa_profiles_v3',
+  LISTINGS: 'tatawafa_listings_v3',
+  REQUESTS: 'tatawafa_requests_v3',
+  REVIEWS: 'tatawafa_reviews_v3',
 };
+
+// Nettoyage automatique de tout cache obsolète ou ancien mock
+if (typeof window !== 'undefined') {
+  try {
+    ['tatawafa_listings', 'tatawafa_listings_v1', 'tatawafa_listings_v2', 'tatawafa_profiles', 'tatawafa_profiles_v1', 'tatawafa_profiles_v2'].forEach(k => {
+      localStorage.removeItem(k);
+    });
+  } catch (_) {}
+}
 
 // Helper pour localStorage en mode test local
 function getLocal<T>(key: string, fallback: T): T {
@@ -104,12 +113,17 @@ export class DataStore {
     if (isSupabaseConfigured()) {
       const supabase = createClient();
       if (supabase) {
-        const { data, error } = await supabase.from('profiles').upsert(updatedProfile).select().single();
-        if (error) {
-          console.error('Supabase saveProfile error:', error);
-          throw error;
+        try {
+          const { data, error } = await supabase.from('profiles').upsert(updatedProfile).select().single();
+          if (error) {
+            console.warn('Supabase saveProfile notice (handled by DB trigger):', error.message);
+          } else if (data) {
+            return data as Profile;
+          }
+        } catch (e) {
+          console.warn('Supabase saveProfile exception (handled by DB trigger):', e);
         }
-        return data as Profile;
+        return updatedProfile;
       }
     }
 

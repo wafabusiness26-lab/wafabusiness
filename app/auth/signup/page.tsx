@@ -5,20 +5,8 @@ import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useAuth } from '@/lib/auth-context';
 import { UserRole } from '@/types';
-import { ALGER_COMMUNES } from '@/lib/constants';
-import { 
-  UserCheck, 
-  Briefcase, 
-  Mail, 
-  Lock, 
-  User, 
-  Phone, 
-  MapPin, 
-  AlertCircle, 
-  Loader2,
-  ShieldCheck,
-  HeartHandshake
-} from 'lucide-react';
+import { ALGER_COMMUNES, ADMIN_CONTACT } from '@/lib/constants';
+import { Logo } from '@/components/Logo';
 
 export default function SignupPage() {
   const router = useRouter();
@@ -29,14 +17,20 @@ export default function SignupPage() {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [phone, setPhone] = useState('');
-  const [location, setLocation] = useState<string>(ALGER_COMMUNES[0]);
+  const [location, setLocation] = useState<string>('Alger Centre');
   const [error, setError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
+  const [emailSent, setEmailSent] = useState(false);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!phone) {
-      setError('Veuillez renseigner un numéro de téléphone pour la coordination.');
+      setError('Veuillez renseigner un numéro de téléphone pour la coordination téléphonique.');
+      return;
+    }
+
+    if (password.length < 6) {
+      setError('Le mot de passe doit comporter au moins 6 caractères.');
       return;
     }
 
@@ -54,10 +48,14 @@ export default function SignupPage() {
       });
 
       if (res.success) {
-        if (role === 'provider') {
-          router.push('/provider/listing');
+        if (res.requiresEmailConfirmation) {
+          setEmailSent(true);
         } else {
-          router.push('/');
+          if (role === 'provider') {
+            router.push('/provider/dashboard');
+          } else {
+            router.push('/client/demandes');
+          }
         }
       } else {
         setError(res.error || 'Impossible de créer le compte.');
@@ -69,177 +67,300 @@ export default function SignupPage() {
     }
   };
 
-  return (
-    <div className="min-h-[85vh] flex items-center justify-center py-12 px-4 sm:px-6 lg:px-8">
-      <div className="max-w-md w-full bg-white rounded-3xl border border-slate-200 p-6 sm:p-8 shadow-card space-y-6">
-        
-        {/* En-tête */}
-        <div className="text-center space-y-2">
-          <div className="w-12 h-12 bg-indigo-600 rounded-2xl flex items-center justify-center text-white mx-auto shadow-md shadow-indigo-200">
-            <HeartHandshake className="w-6 h-6" />
+  // --------------------------------------------------------------------------
+  // ÉCRAN DE SUCCÈS : CONFIRMATION D'EMAIL ENVOYÉE
+  // --------------------------------------------------------------------------
+  if (emailSent) {
+    return (
+      <div className="min-h-[85vh] flex items-center justify-center py-12 px-4 sm:px-6 lg:px-8 bg-[#FAF8F5]">
+        <div className="max-w-md w-full bg-surface-container-lowest rounded-3xl border border-[#ded7ca] p-8 shadow-card space-y-6 text-center animate-in fade-in duration-300">
+          
+          <div className="w-16 h-16 rounded-full bg-secondary-fixed text-secondary flex items-center justify-center mx-auto shadow-sm">
+            <span className="material-symbols-outlined text-3xl material-symbols-fill">mark_email_read</span>
           </div>
-          <h2 className="text-2xl font-extrabold text-slate-900 tracking-tight">
-            Créer un compte TataWafa
-          </h2>
-          <p className="text-xs text-slate-500">
-            Rejoignez la communauté de confiance pour la garde d'enfants et les cours particuliers à Alger.
-          </p>
+
+          <div className="space-y-2">
+            <span className="text-[11px] font-bold uppercase tracking-widest text-secondary block">
+              Vérification de Compte
+            </span>
+            <h2 className="font-serif text-2xl font-bold text-on-surface">
+              Vérifiez votre boîte e-mail
+            </h2>
+            <p className="text-xs sm:text-sm text-on-surface-variant leading-relaxed">
+              Un e-mail de confirmation vient d'être envoyé à l'adresse{' '}
+              <strong className="text-on-surface font-semibold">{email}</strong>.
+            </p>
+          </div>
+
+          <div className="p-4 rounded-2xl bg-[#FAF8F5] border border-[#ebdcd4] text-xs text-on-surface-variant space-y-2 text-left">
+            <div className="flex items-center gap-2 text-secondary font-bold">
+              <span className="material-symbols-outlined text-base">info</span>
+              <span>Instructions d'activation :</span>
+            </div>
+            <p className="leading-relaxed">
+              1. Ouvrez votre messagerie et cliquez sur le lien d'activation reçu.<br />
+              2. Pensez à vérifier vos <strong>courriers indésirables (spams)</strong> si l'e-mail tarde à apparaître.<br />
+              3. Revenez ensuite sur TataWafa pour vous connecter.
+            </p>
+          </div>
+
+          <div className="pt-2 space-y-3">
+            <Link
+              href="/auth/login"
+              className="w-full py-3.5 px-4 bg-primary hover:bg-primary-600 text-white font-bold text-xs rounded-2xl shadow-sm transition flex items-center justify-center gap-2"
+            >
+              <span>Accéder à la page de connexion</span>
+              <span className="material-symbols-outlined text-base">arrow_forward</span>
+            </Link>
+
+            <a
+              href={`tel:${ADMIN_CONTACT.phone}`}
+              className="text-xs text-on-surface-variant hover:text-primary transition flex items-center justify-center gap-1.5 pt-1"
+            >
+              <span className="material-symbols-outlined text-sm">support_agent</span>
+              <span>Besoin d'aide ? Contactez le coordinateur au {ADMIN_CONTACT.phone}</span>
+            </a>
+          </div>
+
+        </div>
+      </div>
+    );
+  }
+
+  // --------------------------------------------------------------------------
+  // FORMULAIRE D'INSCRIPTION ORGANIC STITCH
+  // --------------------------------------------------------------------------
+  return (
+    <div className="min-h-[85vh] flex items-center justify-center py-12 px-4 sm:px-6 lg:px-8 bg-[#FAF8F5]">
+      <div className="max-w-xl w-full bg-surface-container-lowest rounded-3xl border border-[#ded7ca] p-6 sm:p-10 shadow-card space-y-6">
+        
+        {/* En-tête & Logo */}
+        <div className="text-center space-y-3">
+          <Link href="/" className="inline-block group">
+            <Logo className="h-10 w-auto mx-auto group-hover:scale-102 transition-transform" />
+          </Link>
+          <div className="space-y-1">
+            <h2 className="font-serif text-2xl sm:text-3xl font-bold text-on-surface tracking-tight">
+              Créer votre compte TataWafa
+            </h2>
+            <p className="text-xs sm:text-sm text-on-surface-variant max-w-sm mx-auto">
+              Rejoignez le réseau familial de confiance pour la garde d'enfants et les cours particuliers à Alger.
+            </p>
+          </div>
         </div>
 
+        {/* Message d'Erreur */}
         {error && (
-          <div className="p-3.5 rounded-xl bg-rose-50 border border-rose-200 text-rose-700 text-xs flex items-center gap-2">
-            <AlertCircle className="w-4 h-4 shrink-0" />
-            <span>{error}</span>
+          <div className="p-4 rounded-2xl bg-rose-50 border border-rose-200 text-rose-800 text-xs flex items-center gap-3 animate-in fade-in">
+            <span className="material-symbols-outlined text-rose-600 text-lg shrink-0">error</span>
+            <span className="font-medium leading-relaxed">{error}</span>
           </div>
         )}
 
-        <form onSubmit={handleSubmit} className="space-y-4">
+        <form onSubmit={handleSubmit} className="space-y-5">
           
-          {/* Sélecteur de Rôle */}
-          <div>
-            <label className="block text-xs font-semibold text-slate-700 mb-2">
-              Je souhaite m'inscrire en tant que :
+          {/* Sélecteur de Rôle Organique */}
+          <div className="space-y-2">
+            <label className="block text-[11px] font-bold text-on-surface uppercase tracking-wider">
+              Vous rejoignez TataWafa en tant que :
             </label>
-            <div className="grid grid-cols-2 gap-3">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              
+              {/* Option Client / Famille */}
               <button
                 type="button"
                 onClick={() => setRole('client')}
-                className={`p-3 rounded-2xl border text-center flex flex-col items-center gap-1.5 transition ${
+                className={`p-4 rounded-2xl border text-left flex items-start gap-3 transition-all cursor-pointer ${
                   role === 'client'
-                    ? 'border-indigo-600 bg-indigo-50/70 text-indigo-700 ring-2 ring-indigo-500/20'
-                    : 'border-slate-200 text-slate-600 hover:bg-slate-50'
+                    ? 'border-primary bg-primary-fixed/30 ring-1 ring-primary text-on-surface'
+                    : 'border-[#ded7ca] bg-[#FAF8F5] hover:bg-white text-on-surface-variant'
                 }`}
               >
-                <UserCheck className="w-5 h-5" />
-                <span className="text-xs font-bold">Famille / Client</span>
+                <div className={`w-10 h-10 rounded-xl flex items-center justify-center shrink-0 ${
+                  role === 'client' ? 'bg-primary text-white' : 'bg-[#ede8df] text-on-surface-variant'
+                }`}>
+                  <span className="material-symbols-outlined text-xl material-symbols-fill">family_restroom</span>
+                </div>
+                <div>
+                  <h4 className="text-xs font-bold text-on-surface">Famille / Parent</h4>
+                  <p className="text-[11px] text-on-surface-variant mt-0.5 leading-snug">
+                    Trouver une nounou ou un prof vérifié pour mes enfants
+                  </p>
+                </div>
               </button>
 
+              {/* Option Prestataire */}
               <button
                 type="button"
                 onClick={() => setRole('provider')}
-                className={`p-3 rounded-2xl border text-center flex flex-col items-center gap-1.5 transition ${
+                className={`p-4 rounded-2xl border text-left flex items-start gap-3 transition-all cursor-pointer ${
                   role === 'provider'
-                    ? 'border-indigo-600 bg-indigo-50/70 text-indigo-700 ring-2 ring-indigo-500/20'
-                    : 'border-slate-200 text-slate-600 hover:bg-slate-50'
+                    ? 'border-secondary bg-secondary-fixed/30 ring-1 ring-secondary text-on-surface'
+                    : 'border-[#ded7ca] bg-[#FAF8F5] hover:bg-white text-on-surface-variant'
                 }`}
               >
-                <Briefcase className="w-5 h-5" />
-                <span className="text-xs font-bold">Prestataire (Nounou / Prof)</span>
+                <div className={`w-10 h-10 rounded-xl flex items-center justify-center shrink-0 ${
+                  role === 'provider' ? 'bg-secondary text-white' : 'bg-[#ede8df] text-on-surface-variant'
+                }`}>
+                  <span className="material-symbols-outlined text-xl material-symbols-fill">assignment_ind</span>
+                </div>
+                <div>
+                  <h4 className="text-xs font-bold text-on-surface">Intervenante / Nounou</h4>
+                  <p className="text-[11px] text-on-surface-variant mt-0.5 leading-snug">
+                    Postuler et proposer mes services de garde ou soutien
+                  </p>
+                </div>
               </button>
+
             </div>
           </div>
 
-          {/* Nom Complet */}
-          <div>
-            <label className="block text-xs font-semibold text-slate-700 mb-1">Nom Complet</label>
-            <div className="relative">
-              <User className="w-4 h-4 text-slate-400 absolute left-3.5 top-3" />
-              <input
-                type="text"
-                required
-                placeholder="Ex: Amina Benali"
-                value={fullName}
-                onChange={(e) => setFullName(e.target.value)}
-                className="w-full pl-10 pr-3.5 py-2.5 bg-slate-50 border border-slate-300 rounded-xl text-xs sm:text-sm focus:ring-2 focus:ring-indigo-500 focus:bg-white outline-none"
-              />
+          {/* Grille des Champs */}
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            
+            {/* Nom Complet */}
+            <div className="space-y-1 sm:col-span-2">
+              <label className="block text-[11px] font-bold text-on-surface uppercase tracking-wider">
+                Nom Complet
+              </label>
+              <div className="relative">
+                <span className="material-symbols-outlined absolute left-3.5 top-1/2 -translate-y-1/2 text-on-surface-variant text-lg pointer-events-none">
+                  person
+                </span>
+                <input
+                  type="text"
+                  required
+                  placeholder="Ex: Yasmine Belkacem"
+                  value={fullName}
+                  onChange={(e) => setFullName(e.target.value)}
+                  className="w-full pl-10 pr-3.5 py-3 bg-[#FAF8F5] border border-[#ded7ca] rounded-2xl text-xs sm:text-sm text-on-surface focus:ring-2 focus:ring-primary/20 focus:bg-white outline-none font-medium transition"
+                />
+              </div>
             </div>
+
+            {/* Téléphone (Crucial pour la coordination à Alger) */}
+            <div className="space-y-1">
+              <label className="block text-[11px] font-bold text-on-surface uppercase tracking-wider">
+                Téléphone Mobile (Coordination)
+              </label>
+              <div className="relative">
+                <span className="material-symbols-outlined absolute left-3.5 top-1/2 -translate-y-1/2 text-secondary text-lg pointer-events-none">
+                  call
+                </span>
+                <input
+                  type="tel"
+                  required
+                  placeholder="0550 12 34 56"
+                  value={phone}
+                  onChange={(e) => setPhone(e.target.value)}
+                  className="w-full pl-10 pr-3.5 py-3 bg-[#FAF8F5] border border-[#ded7ca] rounded-2xl text-xs sm:text-sm text-on-surface focus:ring-2 focus:ring-secondary/20 focus:bg-white outline-none font-medium transition"
+                />
+              </div>
+            </div>
+
+            {/* Commune de Résidence */}
+            <div className="space-y-1">
+              <label className="block text-[11px] font-bold text-on-surface uppercase tracking-wider">
+                Commune d'Alger
+              </label>
+              <div className="relative">
+                <span className="material-symbols-outlined absolute left-3.5 top-1/2 -translate-y-1/2 text-primary text-lg pointer-events-none">
+                  location_on
+                </span>
+                <select
+                  value={location}
+                  onChange={(e) => setLocation(e.target.value)}
+                  className="w-full pl-10 pr-8 py-3 bg-[#FAF8F5] border border-[#ded7ca] rounded-2xl text-xs sm:text-sm text-on-surface focus:ring-2 focus:ring-primary/20 focus:bg-white outline-none font-medium appearance-none cursor-pointer"
+                >
+                  {ALGER_COMMUNES.map((com) => (
+                    <option key={com} value={com}>
+                      {com}
+                    </option>
+                  ))}
+                </select>
+                <span className="material-symbols-outlined absolute right-3 top-1/2 -translate-y-1/2 text-on-surface-variant text-base pointer-events-none">
+                  expand_more
+                </span>
+              </div>
+            </div>
+
+            {/* Email */}
+            <div className="space-y-1 sm:col-span-2">
+              <label className="block text-[11px] font-bold text-on-surface uppercase tracking-wider">
+                Adresse E-mail
+              </label>
+              <div className="relative">
+                <span className="material-symbols-outlined absolute left-3.5 top-1/2 -translate-y-1/2 text-on-surface-variant text-lg pointer-events-none">
+                  mail
+                </span>
+                <input
+                  type="email"
+                  required
+                  placeholder="nom@exemple.dz"
+                  value={email}
+                  onChange={(e) => setEmail(e.target.value)}
+                  className="w-full pl-10 pr-3.5 py-3 bg-[#FAF8F5] border border-[#ded7ca] rounded-2xl text-xs sm:text-sm text-on-surface focus:ring-2 focus:ring-primary/20 focus:bg-white outline-none font-medium transition"
+                />
+              </div>
+            </div>
+
+            {/* Mot de passe */}
+            <div className="space-y-1 sm:col-span-2">
+              <label className="block text-[11px] font-bold text-on-surface uppercase tracking-wider">
+                Mot de Passe (6 caractères min.)
+              </label>
+              <div className="relative">
+                <span className="material-symbols-outlined absolute left-3.5 top-1/2 -translate-y-1/2 text-on-surface-variant text-lg pointer-events-none">
+                  lock
+                </span>
+                <input
+                  type="password"
+                  required
+                  placeholder="••••••••"
+                  value={password}
+                  onChange={(e) => setPassword(e.target.value)}
+                  className="w-full pl-10 pr-3.5 py-3 bg-[#FAF8F5] border border-[#ded7ca] rounded-2xl text-xs sm:text-sm text-on-surface focus:ring-2 focus:ring-primary/20 focus:bg-white outline-none font-medium transition"
+                />
+              </div>
+            </div>
+
           </div>
 
-          {/* Email */}
-          <div>
-            <label className="block text-xs font-semibold text-slate-700 mb-1">Adresse Email</label>
-            <div className="relative">
-              <Mail className="w-4 h-4 text-slate-400 absolute left-3.5 top-3" />
-              <input
-                type="email"
-                required
-                placeholder="amina@example.com"
-                value={email}
-                onChange={(e) => setEmail(e.target.value)}
-                className="w-full pl-10 pr-3.5 py-2.5 bg-slate-50 border border-slate-300 rounded-xl text-xs sm:text-sm focus:ring-2 focus:ring-indigo-500 focus:bg-white outline-none"
-              />
-            </div>
+          {/* Rassurance Piliers TataWafa */}
+          <div className="p-3.5 rounded-2xl bg-[#FAF8F5] border border-[#ebdcd4] flex items-center gap-3">
+            <span className="material-symbols-outlined text-secondary text-xl shrink-0 material-symbols-fill">
+              verified_user
+            </span>
+            <p className="text-[11px] text-on-surface-variant leading-relaxed">
+              <strong>Engagement de confidentialité :</strong> Vos coordonnées téléphoniques restent strictement protégées. Zéro document sensible en ligne, coordination humaine directe par téléphone.
+            </p>
           </div>
 
-          {/* Mot de passe */}
-          <div>
-            <label className="block text-xs font-semibold text-slate-700 mb-1">Mot de passe</label>
-            <div className="relative">
-              <Lock className="w-4 h-4 text-slate-400 absolute left-3.5 top-3" />
-              <input
-                type="password"
-                required
-                placeholder="••••••••"
-                value={password}
-                onChange={(e) => setPassword(e.target.value)}
-                className="w-full pl-10 pr-3.5 py-2.5 bg-slate-50 border border-slate-300 rounded-xl text-xs sm:text-sm focus:ring-2 focus:ring-indigo-500 focus:bg-white outline-none"
-              />
-            </div>
-          </div>
-
-          {/* Téléphone */}
-          <div>
-            <label className="block text-xs font-semibold text-slate-700 mb-1">Numéro de Téléphone (Coordination)</label>
-            <div className="relative">
-              <Phone className="w-4 h-4 text-slate-400 absolute left-3.5 top-3" />
-              <input
-                type="tel"
-                required
-                placeholder="0550 12 34 56"
-                value={phone}
-                onChange={(e) => setPhone(e.target.value)}
-                className="w-full pl-10 pr-3.5 py-2.5 bg-slate-50 border border-slate-300 rounded-xl text-xs sm:text-sm focus:ring-2 focus:ring-indigo-500 focus:bg-white outline-none"
-              />
-            </div>
-          </div>
-
-          {/* Commune d'Alger */}
-          <div>
-            <label className="block text-xs font-semibold text-slate-700 mb-1">Commune de résidence (Alger)</label>
-            <div className="relative">
-              <MapPin className="w-4 h-4 text-slate-400 absolute left-3.5 top-3" />
-              <select
-                value={location}
-                onChange={(e) => setLocation(e.target.value)}
-                className="w-full pl-10 pr-3.5 py-2.5 bg-slate-50 border border-slate-300 rounded-xl text-xs sm:text-sm focus:ring-2 focus:ring-indigo-500 focus:bg-white outline-none cursor-pointer"
-              >
-                {ALGER_COMMUNES.map((commune) => (
-                  <option key={commune} value={commune}>
-                    {commune}
-                  </option>
-                ))}
-              </select>
-            </div>
-          </div>
-
-          {/* Note sur la vérification en personne */}
-          <div className="p-3 bg-indigo-50/60 rounded-xl border border-indigo-100 text-[11px] text-indigo-900 leading-relaxed">
-            <div className="font-semibold flex items-center gap-1 mb-0.5">
-              <ShieldCheck className="w-3.5 h-3.5 text-indigo-600" />
-              Vérification en main propre
-            </div>
-            Pour votre sécurité, vos pièces d'identité ne sont pas téléversées sur le web mais vérifiées en personne par l'administrateur.
-          </div>
-
+          {/* Bouton de Soumission */}
           <button
             type="submit"
             disabled={submitting}
-            className="w-full py-3 bg-indigo-600 hover:bg-indigo-700 text-white font-bold text-sm rounded-xl shadow-md shadow-indigo-200 transition flex items-center justify-center gap-2 disabled:opacity-50"
+            className="w-full py-3.5 px-4 bg-primary hover:bg-primary-600 text-white font-bold text-xs sm:text-sm rounded-2xl shadow-sm hover:shadow-md transition-all flex items-center justify-center gap-2 disabled:opacity-50 cursor-pointer"
           >
             {submitting ? (
               <>
-                <Loader2 className="w-4 h-4 animate-spin" />
-                <span>Création du compte...</span>
+                <span className="material-symbols-outlined text-lg animate-spin">progress_activity</span>
+                <span>Création de votre compte en cours...</span>
               </>
             ) : (
-              <span>Créer mon compte</span>
+              <>
+                <span>Créer mon compte {role === 'provider' ? 'Prestataire' : 'Famille'}</span>
+                <span className="material-symbols-outlined text-base">arrow_forward</span>
+              </>
             )}
           </button>
+
         </form>
 
-        <div className="text-center text-xs text-slate-500">
-          Vous avez déjà un compte ?{' '}
-          <Link href="/auth/login" className="font-bold text-indigo-600 hover:underline">
+        {/* Lien de Connexion */}
+        <div className="pt-2 text-center text-xs text-on-surface-variant">
+          Vous possédez déjà un compte ?{' '}
+          <Link href="/auth/login" className="font-bold text-primary hover:underline">
             Se connecter
           </Link>
         </div>

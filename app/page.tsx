@@ -23,7 +23,7 @@ export default function HomePage() {
       try {
         const data = await DataStore.getListings();
         // Strict hand-to-hand verification rule: only verified providers can appear
-        const verified = data.filter(item => item.provider?.verification_status === "verifie_en_main_propre" || item.provider?.id_card_verified);
+        const verified = data.filter(item => item.provider?.verification_status === "verifie_en_main_propre");
         // Sort real-time best ranked services first
         verified.sort((a, b) => (b.average_rating || 0) - (a.average_rating || 0));
         setListings(verified);
@@ -311,13 +311,15 @@ export default function HomePage() {
           <div className="flex flex-col md:flex-row items-start md:items-end justify-between gap-4 mb-12">
             <div className="space-y-2">
               <span className="text-[11px] font-bold uppercase tracking-widest text-secondary block">
-                Sélection Rigoureuse de la Semaine
+                {listings.length > 0 ? 'Sélection Rigoureuse de la Semaine' : 'Vérification Physique en Main Propre'}
               </span>
               <h2 className="font-serif text-2xl sm:text-4xl text-on-surface font-semibold tracking-tight">
-                Tatas et Éducatrices Vedettes à Alger
+                {listings.length > 0 ? 'Tatas et Éducatrices Vedettes à Alger' : 'Services et Annonces à Alger'}
               </h2>
               <p className="text-sm text-on-surface-variant">
-                Profils certifiés en personne, évalués par les familles de leurs communes.
+                {listings.length > 0
+                  ? 'Profils certifiés en personne, évalués par les familles de leurs communes.'
+                  : 'Seuls les profils dont l\'identité et les diplômes ont été contrôlés physiquement au bureau d\'Alger apparaissent ici.'}
               </p>
             </div>
 

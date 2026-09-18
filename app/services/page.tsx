@@ -37,7 +37,7 @@ function ServicesDirectoryContent() {
         });
 
         // Strict hand-to-hand verification rule: only verified providers can appear in directory!
-        let verifiedOnly = data.filter((item: any) => item.provider?.verification_status === "verifie_en_main_propre" || item.provider?.id_card_verified || item.is_verified);
+        let verifiedOnly = data.filter((item: any) => item.provider?.verification_status === "verifie_en_main_propre");
 
         // Price filtering
         let filtered = verifiedOnly.filter((item: any) => {
