@@ -10,7 +10,7 @@ export function createClient() {
   const cookieStore = cookies();
 
   const url = (process.env.NEXT_PUBLIC_SUPABASE_URL || process.env.NEXT_PUBLIC_STORAGE_URL || process.env.STORAGE_URL)!;
-  const anonKey = (process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || process.env.NEXT_PUBLIC_STORAGE_ANON_KEY || process.env.STORAGE_ANON_KEY)!;
+  const anonKey = (process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY || process.env.NEXT_PUBLIC_STORAGE_ANON_KEY || process.env.STORAGE_ANON_KEY)!;
 
   return createServerClient(
     url,
