@@ -121,13 +121,76 @@ export const SAFETY_PILLARS = [
   }
 ];
 
+export const LEGALIZATION_NOTICE = "Chaque photocopie présentée par le prestataire doit obligatoirement être une copie conforme légalisée par l'APC (Mairie). Aucune copie simple non tamponnée n'est acceptée.";
+
 export const PHYSICAL_CHECKLIST = [
-  'Carte nationale d\'identité biométrique originale (ou Passeport algérien en cours de validité)',
-  'Certificat de résidence ou justificatif de domicile récent dans la Wilaya d\'Alger',
-  'Diplômes originaux, attestations universitaires ou certificats d\'aptitude pédagogique',
-  'Attestation d\'expérience ou références d\'anciennes familles (pour les gardes d\'enfants)',
-  'Numéro de téléphone personnel actif et vérifié'
-];
+  "Photocopie légalisée de la pièce d'identité (CNI biométrique ou passeport en cours de validité)",
+  "Extrait de naissance récent (12S ou état civil)",
+  "Fiche familiale d'état civil (ou fiche individuelle pour célibataire)",
+  "Certificat de résidence récent dans la Wilaya d'Alger",
+  "Casier judiciaire — adultes (Bulletin N°3 vierge récent délivré par la justice)",
+  "3 photos d'identité récentes",
+  "Photocopie légalisée du diplôme ou certificat de scolarité"
+] as const;
+
+export const VERIFICATION_DOCUMENTS_DETAILED = [
+  {
+    key: 'id_card_verified' as const,
+    number: 1,
+    title: "Photocopie de la pièce d'identité",
+    subtitle: "Photocopie légalisée de la CNI biométrique ou passeport en cours de validité",
+    badge: "Copie légalisée",
+    icon: 'badge'
+  },
+  {
+    key: 'birth_certificate_verified' as const,
+    number: 2,
+    title: "Extrait de naissance",
+    subtitle: "Extrait d'acte de naissance officiel récent (12S ou état civil)",
+    badge: "Document officiel",
+    icon: 'cake'
+  },
+  {
+    key: 'family_record_verified' as const,
+    number: 3,
+    title: "Fiche familiale",
+    subtitle: "Fiche familiale d'état civil (ou fiche individuelle pour célibataire)",
+    badge: "État civil",
+    icon: 'group'
+  },
+  {
+    key: 'residence_certificate_verified' as const,
+    number: 4,
+    title: "Certificat de résidence",
+    subtitle: "Justificatif récent de résidence dans l'une des 57 communes d'Alger",
+    badge: "Wilaya d'Alger",
+    icon: 'home_pin'
+  },
+  {
+    key: 'criminal_record_verified' as const,
+    number: 5,
+    title: "Casier judiciaire — adultes",
+    subtitle: "Bulletin N°3 récent vierge délivré par les autorités judiciaires",
+    badge: "Justice (B3)",
+    icon: 'gavel'
+  },
+  {
+    key: 'photos_verified' as const,
+    number: 6,
+    title: "3 photos d'identité",
+    subtitle: "3 photographies d'identité récentes couleur au format officiel",
+    badge: "3 exemplaires",
+    icon: 'photo_camera'
+  },
+  {
+    key: 'diploma_verified' as const,
+    number: 7,
+    title: "Diplôme ou certificat de scolarité",
+    subtitle: "Photocopie légalisée du diplôme d'État, titre universitaire ou certificat de scolarité",
+    badge: "Copie légalisée",
+    icon: 'school'
+  }
+] as const;
 
 export const TARIFS_INDICATIFS = {
   babysitting: [
@@ -149,7 +212,7 @@ export const FAQ_ITEMS = [
   },
   {
     q: 'Pourquoi les documents ne sont-ils pas téléversés sur le site ?',
-    a: 'Pour protéger les données personnelles et garantir une sécurité maximale aux familles, nous refusons de stocker des pièces d\'identité sur le cloud. L\'administrateur inspecte physiquement les documents originaux de main à main avant d\'attribuer le badge de certification.'
+    a: 'Pour protéger les données personnelles et garantir une sécurité maximale aux familles, nous refusons de stocker des pièces d\'identité sur le cloud. L\'administrateur inspecte physiquement le dossier complet de 7 pièces (photocopies obligatoirement légalisées par l\'APC) de main à main avant d\'attribuer le badge de certification.'
   },
   {
     q: 'Comment s\'effectue le paiement ?',
@@ -157,7 +220,7 @@ export const FAQ_ITEMS = [
   },
   {
     q: 'Comment devenir prestataire sur TataWafa ?',
-    a: 'Il vous suffit de créer votre compte et de remplir votre annonce de service (sans aucun document en ligne). L\'administrateur vous appellera ensuite pour fixer un rendez-vous à Alger et vérifier vos pièces d\'identité et attestations en personne.'
+    a: 'Il vous suffit de créer votre compte et de remplir votre annonce de service (sans aucun document en ligne). L\'administrateur vous appellera ensuite pour fixer un rendez-vous à Alger et vérifier votre dossier officiel de 7 pièces légalisées en personne.'
   },
   {
     q: 'Que faire en cas d\'imprévu ou de désistement ?',

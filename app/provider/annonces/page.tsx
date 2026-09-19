@@ -187,7 +187,7 @@ export default function ProviderAnnoncesPage() {
               Votre annonce a été enregistrée avec succès !
             </h2>
             <p className="text-sm text-slate-600 leading-relaxed">
-              Votre profil est maintenant configuré. Pour activer votre badge certifié officiel, préparez votre pièce d'identité originale et vos justificatifs pour la rencontre avec l'administrateur.
+              Votre profil est maintenant configuré. Pour activer votre badge certifié officiel, préparez votre dossier complet de 7 pièces (photocopies obligatoirement légalisées par l'APC) pour la rencontre avec l'administrateur.
             </p>
           </div>
 
@@ -209,7 +209,7 @@ export default function ProviderAnnoncesPage() {
               href="/provider/verification"
               className="px-6 py-3 bg-amber-600 hover:bg-amber-700 text-white font-bold text-xs rounded-xl shadow-md transition"
             >
-              Consulter le centre de vérification physique
+              Consulter la checklist des 7 pièces légalisées
             </Link>
             <Link
               href="/provider/dashboard"

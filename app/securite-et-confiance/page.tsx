@@ -60,8 +60,15 @@ export default function SecurityAndTrustPage() {
         </h2>
 
         <p className="text-xs sm:text-sm text-slate-300 leading-relaxed max-w-3xl">
-          Contrairement aux plateformes classiques qui acceptent de simples photos ou scans facilement falsifiables, notre équipe administrative rencontre chaque candidat en personne à Alger Centre pour un contrôle visuel et tactile des pièces :
+          Contrairement aux plateformes classiques qui acceptent de simples photos ou scans facilement falsifiables, notre équipe administrative rencontre chaque candidat en personne à Alger Centre pour un contrôle visuel et tactile des 7 pièces obligatoires :
         </p>
+
+        <div className="p-3.5 rounded-2xl bg-amber-500/15 border border-amber-500/25 flex items-start gap-2.5 text-xs text-amber-200">
+          <ShieldCheck className="w-5 h-5 text-amber-400 shrink-0 mt-0.5" />
+          <p className="leading-relaxed text-xs">
+            <strong>Exigence d'agrément officiel :</strong> Chaque photocopie présentée fait l'objet d'une vérification stricte de sa <strong>conformité légalisée auprès de l'APC (Mairie)</strong>. Aucune copie simple non tamponnée n'est acceptée.
+          </p>
+        </div>
 
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-2">
           {PHYSICAL_CHECKLIST.map((item, idx) => (

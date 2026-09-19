@@ -21,9 +21,14 @@ export interface Profile {
   avatar_url?: string | null;
   bio?: string | null;
   created_at?: string;
-  // Attributs de confiance et vérification physique
+  // Attributs de confiance et vérification physique (7 pièces obligatoires)
   verification_status?: VerificationStatus;
   id_card_verified?: boolean;
+  birth_certificate_verified?: boolean;
+  family_record_verified?: boolean;
+  residence_certificate_verified?: boolean;
+  criminal_record_verified?: boolean;
+  photos_verified?: boolean;
   diploma_verified?: boolean;
   admin_verification_date?: string | null;
   admin_verification_notes?: string | null;

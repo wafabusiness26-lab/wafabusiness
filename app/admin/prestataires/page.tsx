@@ -16,8 +16,13 @@ export default function AdminPrestatairesPage() {
   const [loading, setLoading] = useState(true);
   const [updating, setUpdating] = useState(false);
 
-  // Checklist states for physical verification
+  // Checklist states for physical verification (7 pièces obligatoires)
   const [idCardChecked, setIdCardChecked] = useState(false);
+  const [birthCertificateChecked, setBirthCertificateChecked] = useState(false);
+  const [familyRecordChecked, setFamilyRecordChecked] = useState(false);
+  const [residenceCertificateChecked, setResidenceCertificateChecked] = useState(false);
+  const [criminalRecordChecked, setCriminalRecordChecked] = useState(false);
+  const [photosChecked, setPhotosChecked] = useState(false);
   const [diplomaChecked, setDiplomaChecked] = useState(false);
   const [verificationNotes, setVerificationNotes] = useState('');
 
@@ -44,10 +49,35 @@ export default function AdminPrestatairesPage() {
   useEffect(() => {
     if (selectedProvider) {
       setIdCardChecked(Boolean(selectedProvider.id_card_verified));
+      setBirthCertificateChecked(Boolean(selectedProvider.birth_certificate_verified));
+      setFamilyRecordChecked(Boolean(selectedProvider.family_record_verified));
+      setResidenceCertificateChecked(Boolean(selectedProvider.residence_certificate_verified));
+      setCriminalRecordChecked(Boolean(selectedProvider.criminal_record_verified));
+      setPhotosChecked(Boolean(selectedProvider.photos_verified));
       setDiplomaChecked(Boolean(selectedProvider.diploma_verified));
       setVerificationNotes(selectedProvider.admin_verification_notes || '');
     }
   }, [selectedProvider]);
+
+  const setAllChecked = (val: boolean) => {
+    setIdCardChecked(val);
+    setBirthCertificateChecked(val);
+    setFamilyRecordChecked(val);
+    setResidenceCertificateChecked(val);
+    setCriminalRecordChecked(val);
+    setPhotosChecked(val);
+    setDiplomaChecked(val);
+  };
+
+  const checkedCount = [
+    idCardChecked,
+    birthCertificateChecked,
+    familyRecordChecked,
+    residenceCertificateChecked,
+    criminalRecordChecked,
+    photosChecked,
+    diplomaChecked,
+  ].filter(Boolean).length;
 
   const handleCertify = async (status: VerificationStatus) => {
     if (!selectedProvider) return;
@@ -55,6 +85,11 @@ export default function AdminPrestatairesPage() {
     try {
       await DataStore.updateVerificationStatus(selectedProvider.id, status, {
         id_card_verified: idCardChecked,
+        birth_certificate_verified: birthCertificateChecked,
+        family_record_verified: familyRecordChecked,
+        residence_certificate_verified: residenceCertificateChecked,
+        criminal_record_verified: criminalRecordChecked,
+        photos_verified: photosChecked,
         diploma_verified: diplomaChecked,
         notes: verificationNotes,
       });
@@ -223,37 +258,196 @@ export default function AdminPrestatairesPage() {
                   </div>
                 </div>
 
-                {/* Checklist Controls */}
+                {/* Checklist Controls - 7 Pièces Officielles */}
                 <div className="space-y-3">
-                  <h4 className="text-xs font-bold text-on-surface uppercase tracking-wider">
-                    Contrôle des pièces originales au bureau :
-                  </h4>
-
-                  <label className="flex items-start gap-3 p-3.5 rounded-2xl bg-[#FAF8F5] border border-[#ded7ca] cursor-pointer">
-                    <input
-                      type="checkbox"
-                      checked={idCardChecked}
-                      onChange={(e) => setIdCardChecked(e.target.checked)}
-                      className="mt-0.5 accent-primary"
-                    />
-                    <div className="text-xs">
-                      <strong className="text-on-surface block">CNI Biométrique originale contrôlée</strong>
-                      <span className="text-[11px] text-on-surface-variant">Identité vérifiée en face à face avec le titulaire.</span>
+                  <div className="flex items-center justify-between gap-2">
+                    <div>
+                      <h4 className="text-xs font-bold text-on-surface uppercase tracking-wider">
+                        Contrôle des 7 pièces en main propre :
+                      </h4>
+                      <p className="text-[11px] text-on-surface-variant">
+                        Inspection physique réalisée au bureau d'Alger.
+                      </p>
                     </div>
-                  </label>
+                    <span className={`px-2.5 py-1 rounded-full text-[11px] font-bold ${
+                      checkedCount === 7 
+                        ? 'bg-secondary-fixed text-secondary' 
+                        : 'bg-[#ede8df] text-on-surface-variant'
+                    }`}>
+                      {checkedCount}/7 validées
+                    </span>
+                  </div>
 
-                  <label className="flex items-start gap-3 p-3.5 rounded-2xl bg-[#FAF8F5] border border-[#ded7ca] cursor-pointer">
-                    <input
-                      type="checkbox"
-                      checked={diplomaChecked}
-                      onChange={(e) => setDiplomaChecked(e.target.checked)}
-                      className="mt-0.5 accent-primary"
-                    />
-                    <div className="text-xs">
-                      <strong className="text-on-surface block">Diplômes &amp; Casier B3 originaux inspectés</strong>
-                      <span className="text-[11px] text-on-surface-variant">Attestations conformes et certifiées conformes à l'original.</span>
+                  {/* Note persistante obligatoire sur les copies légalisées */}
+                  <div className="p-3.5 rounded-2xl bg-[#fcf8ee] border border-[#D4A373] flex items-start gap-2.5 text-xs text-[#7d562d]">
+                    <span className="material-symbols-outlined text-[#8c5828] text-lg shrink-0 mt-0.5 material-symbols-fill">
+                      gavel
+                    </span>
+                    <div className="space-y-1">
+                      <strong className="block text-sm text-[#422401] font-bold">
+                        Règle d'Agrément : Copies Légalisées Obligatoires
+                      </strong>
+                      <p className="text-on-surface-variant leading-relaxed text-[11px]">
+                        Chaque photocopie présentée doit <strong>obligatoirement être une copie conforme légalisée par l'APC (Mairie)</strong>. Aucune photocopie simple non tamponnée n'est recevable.
+                      </p>
                     </div>
-                  </label>
+                  </div>
+
+                  {/* Boutons d'action rapide */}
+                  <div className="flex items-center justify-end gap-2 text-[11px]">
+                    <button
+                      type="button"
+                      onClick={() => setAllChecked(true)}
+                      className="px-2.5 py-1 rounded-lg bg-surface-container border border-[#ded7ca] text-secondary font-bold hover:bg-[#ede8df] transition flex items-center gap-1"
+                    >
+                      <span className="material-symbols-outlined text-sm">done_all</span>
+                      <span>Tout cocher (Dossier complet)</span>
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setAllChecked(false)}
+                      className="px-2.5 py-1 rounded-lg bg-surface-container border border-[#ded7ca] text-on-surface-variant hover:bg-[#ede8df] transition"
+                    >
+                      Décocher tout
+                    </button>
+                  </div>
+
+                  <div className="space-y-2 max-h-[380px] overflow-y-auto pr-1">
+                    {/* 1. Photocopie de la pièce d'identité */}
+                    <label className={`flex items-start gap-3 p-3 rounded-2xl border transition cursor-pointer ${
+                      idCardChecked ? 'bg-secondary-fixed/30 border-secondary/40' : 'bg-[#FAF8F5] border-[#ded7ca]'
+                    }`}>
+                      <input
+                        type="checkbox"
+                        checked={idCardChecked}
+                        onChange={(e) => setIdCardChecked(e.target.checked)}
+                        className="mt-0.5 accent-secondary w-4 h-4 rounded cursor-pointer"
+                      />
+                      <div className="text-xs">
+                        <div className="flex items-center gap-2">
+                          <strong className="text-on-surface font-bold">1. Photocopie de la pièce d'identité</strong>
+                          <span className="text-[10px] px-1.5 py-0.2 bg-primary-fixed/60 text-primary rounded-md font-bold">Légalisée</span>
+                        </div>
+                        <span className="text-[11px] text-on-surface-variant block mt-0.5">
+                          Photocopie légalisée de la CNI biométrique ou passeport en cours de validité.
+                        </span>
+                      </div>
+                    </label>
+
+                    {/* 2. Extrait de naissance */}
+                    <label className={`flex items-start gap-3 p-3 rounded-2xl border transition cursor-pointer ${
+                      birthCertificateChecked ? 'bg-secondary-fixed/30 border-secondary/40' : 'bg-[#FAF8F5] border-[#ded7ca]'
+                    }`}>
+                      <input
+                        type="checkbox"
+                        checked={birthCertificateChecked}
+                        onChange={(e) => setBirthCertificateChecked(e.target.checked)}
+                        className="mt-0.5 accent-secondary w-4 h-4 rounded cursor-pointer"
+                      />
+                      <div className="text-xs">
+                        <strong className="text-on-surface font-bold">2. Extrait de naissance</strong>
+                        <span className="text-[11px] text-on-surface-variant block mt-0.5">
+                          Extrait d'acte de naissance officiel récent (12S ou état civil).
+                        </span>
+                      </div>
+                    </label>
+
+                    {/* 3. Fiche familiale */}
+                    <label className={`flex items-start gap-3 p-3 rounded-2xl border transition cursor-pointer ${
+                      familyRecordChecked ? 'bg-secondary-fixed/30 border-secondary/40' : 'bg-[#FAF8F5] border-[#ded7ca]'
+                    }`}>
+                      <input
+                        type="checkbox"
+                        checked={familyRecordChecked}
+                        onChange={(e) => setFamilyRecordChecked(e.target.checked)}
+                        className="mt-0.5 accent-secondary w-4 h-4 rounded cursor-pointer"
+                      />
+                      <div className="text-xs">
+                        <strong className="text-on-surface font-bold">3. Fiche familiale</strong>
+                        <span className="text-[11px] text-on-surface-variant block mt-0.5">
+                          Fiche familiale d'état civil (ou fiche individuelle pour célibataire).
+                        </span>
+                      </div>
+                    </label>
+
+                    {/* 4. Certificat de résidence */}
+                    <label className={`flex items-start gap-3 p-3 rounded-2xl border transition cursor-pointer ${
+                      residenceCertificateChecked ? 'bg-secondary-fixed/30 border-secondary/40' : 'bg-[#FAF8F5] border-[#ded7ca]'
+                    }`}>
+                      <input
+                        type="checkbox"
+                        checked={residenceCertificateChecked}
+                        onChange={(e) => setResidenceCertificateChecked(e.target.checked)}
+                        className="mt-0.5 accent-secondary w-4 h-4 rounded cursor-pointer"
+                      />
+                      <div className="text-xs">
+                        <strong className="text-on-surface font-bold">4. Certificat de résidence</strong>
+                        <span className="text-[11px] text-on-surface-variant block mt-0.5">
+                          Certificat de résidence récent dans l'une des 57 communes de la Wilaya d'Alger.
+                        </span>
+                      </div>
+                    </label>
+
+                    {/* 5. Casier judiciaire — adultes */}
+                    <label className={`flex items-start gap-3 p-3 rounded-2xl border transition cursor-pointer ${
+                      criminalRecordChecked ? 'bg-secondary-fixed/30 border-secondary/40' : 'bg-[#FAF8F5] border-[#ded7ca]'
+                    }`}>
+                      <input
+                        type="checkbox"
+                        checked={criminalRecordChecked}
+                        onChange={(e) => setCriminalRecordChecked(e.target.checked)}
+                        className="mt-0.5 accent-secondary w-4 h-4 rounded cursor-pointer"
+                      />
+                      <div className="text-xs">
+                        <div className="flex items-center gap-2">
+                          <strong className="text-on-surface font-bold">5. Casier judiciaire — adultes</strong>
+                          <span className="text-[10px] px-1.5 py-0.2 bg-secondary-fixed text-secondary rounded-md font-bold">Bulletin N°3</span>
+                        </div>
+                        <span className="text-[11px] text-on-surface-variant block mt-0.5">
+                          Extrait de casier judiciaire vierge récent (moins de 3 mois).
+                        </span>
+                      </div>
+                    </label>
+
+                    {/* 6. 3 photos */}
+                    <label className={`flex items-start gap-3 p-3 rounded-2xl border transition cursor-pointer ${
+                      photosChecked ? 'bg-secondary-fixed/30 border-secondary/40' : 'bg-[#FAF8F5] border-[#ded7ca]'
+                    }`}>
+                      <input
+                        type="checkbox"
+                        checked={photosChecked}
+                        onChange={(e) => setPhotosChecked(e.target.checked)}
+                        className="mt-0.5 accent-secondary w-4 h-4 rounded cursor-pointer"
+                      />
+                      <div className="text-xs">
+                        <strong className="text-on-surface font-bold">6. 3 photos d'identité</strong>
+                        <span className="text-[11px] text-on-surface-variant block mt-0.5">
+                          3 photographies d'identité récentes en couleur au format officiel.
+                        </span>
+                      </div>
+                    </label>
+
+                    {/* 7. Diplôme ou certificat de scolarité */}
+                    <label className={`flex items-start gap-3 p-3 rounded-2xl border transition cursor-pointer ${
+                      diplomaChecked ? 'bg-secondary-fixed/30 border-secondary/40' : 'bg-[#FAF8F5] border-[#ded7ca]'
+                    }`}>
+                      <input
+                        type="checkbox"
+                        checked={diplomaChecked}
+                        onChange={(e) => setDiplomaChecked(e.target.checked)}
+                        className="mt-0.5 accent-secondary w-4 h-4 rounded cursor-pointer"
+                      />
+                      <div className="text-xs">
+                        <div className="flex items-center gap-2">
+                          <strong className="text-on-surface font-bold">7. Diplôme ou certificat de scolarité</strong>
+                          <span className="text-[10px] px-1.5 py-0.2 bg-primary-fixed/60 text-primary rounded-md font-bold">Légalisé</span>
+                        </div>
+                        <span className="text-[11px] text-on-surface-variant block mt-0.5">
+                          Photocopie légalisée du diplôme d'État ou certificat de scolarité.
+                        </span>
+                      </div>
+                    </label>
+                  </div>
                 </div>
 
                 {/* Notes */}

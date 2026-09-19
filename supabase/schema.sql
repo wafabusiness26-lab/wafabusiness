@@ -16,9 +16,14 @@ create table if not exists public.profiles (
   avatar_url text,
   bio text,
   created_at timestamptz default now(),
-  -- Protocole de vérification physique en main propre
+  -- Protocole de vérification physique en main propre (7 pièces obligatoires)
   verification_status text default 'en_attente_physique' check (verification_status in ('non_verifie', 'en_attente_physique', 'verifie_en_main_propre', 'suspendu')),
   id_card_verified boolean default false,
+  birth_certificate_verified boolean default false,
+  family_record_verified boolean default false,
+  residence_certificate_verified boolean default false,
+  criminal_record_verified boolean default false,
+  photos_verified boolean default false,
   diploma_verified boolean default false,
   admin_verification_date timestamptz,
   admin_verification_notes text
@@ -86,6 +91,11 @@ alter table public.profiles add column if not exists avatar_url text;
 alter table public.profiles add column if not exists bio text;
 alter table public.profiles add column if not exists verification_status text default 'en_attente_physique';
 alter table public.profiles add column if not exists id_card_verified boolean default false;
+alter table public.profiles add column if not exists birth_certificate_verified boolean default false;
+alter table public.profiles add column if not exists family_record_verified boolean default false;
+alter table public.profiles add column if not exists residence_certificate_verified boolean default false;
+alter table public.profiles add column if not exists criminal_record_verified boolean default false;
+alter table public.profiles add column if not exists photos_verified boolean default false;
 alter table public.profiles add column if not exists diploma_verified boolean default false;
 alter table public.profiles add column if not exists admin_verification_date timestamptz;
 alter table public.profiles add column if not exists admin_verification_notes text;
@@ -173,6 +183,11 @@ begin
     new.role := old.role;
     new.verification_status := old.verification_status;
     new.id_card_verified := old.id_card_verified;
+    new.birth_certificate_verified := old.birth_certificate_verified;
+    new.family_record_verified := old.family_record_verified;
+    new.residence_certificate_verified := old.residence_certificate_verified;
+    new.criminal_record_verified := old.criminal_record_verified;
+    new.photos_verified := old.photos_verified;
     new.diploma_verified := old.diploma_verified;
     new.admin_verification_date := old.admin_verification_date;
     new.admin_verification_notes := old.admin_verification_notes;

@@ -15,7 +15,7 @@ import {
   Calendar,
   Sparkles
 } from 'lucide-react';
-import { TARIFS_INDICATIFS, PHYSICAL_CHECKLIST, ADMIN_CONTACT } from '@/lib/constants';
+import { TARIFS_INDICATIFS, PHYSICAL_CHECKLIST, VERIFICATION_DOCUMENTS_DETAILED, LEGALIZATION_NOTICE, ADMIN_CONTACT } from '@/lib/constants';
 import { AdminCallCard } from '@/components/AdminCallCard';
 
 export default function BecomeProviderPage() {
@@ -159,21 +159,46 @@ export default function BecomeProviderPage() {
         <div className="bg-indigo-50/80 rounded-3xl border border-indigo-200 p-8 sm:p-10 space-y-6">
           <div className="flex items-center gap-2 text-indigo-950 font-bold text-lg">
             <UserCheck2 className="w-6 h-6 text-indigo-600" />
-            <span>Processus d'agrément en main propre</span>
+            <span>Dossier physique d'agrément en main propre (7 pièces)</span>
           </div>
 
           <p className="text-xs sm:text-sm text-slate-700 leading-relaxed">
-            Pour obtenir le <strong>Badge Certifié TataWafa</strong> et recevoir des demandes de familles, l'administrateur convient d'un rendez-vous avec vous pour inspecter vos documents originaux :
+            Pour obtenir le <strong>Badge Certifié Amana</strong> et recevoir des demandes de familles, l'administrateur convient d'un rendez-vous avec vous pour inspecter vos pièces originales et constituer votre dossier d'agrément officiel :
           </p>
 
-          <ul className="space-y-2.5">
-            {PHYSICAL_CHECKLIST.map((item, idx) => (
-              <li key={idx} className="flex items-start gap-2.5 text-xs text-slate-800 bg-white p-3.5 rounded-xl border border-indigo-100 shadow-sm">
-                <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0 mt-0.5" />
-                <span>{item}</span>
-              </li>
+          {/* Note persistante obligatoire sur les copies légalisées */}
+          <div className="p-4 rounded-2xl bg-amber-50 border border-amber-200 flex items-start gap-3 text-xs text-amber-900 shadow-xs">
+            <ShieldCheck className="w-5 h-5 text-amber-700 shrink-0 mt-0.5" />
+            <div className="space-y-1">
+              <strong className="block text-sm font-bold text-amber-950">
+                Règle impérative : Copies obligatoirement légalisées
+              </strong>
+              <p className="text-amber-800 leading-relaxed text-xs">
+                Chaque photocopie présentée lors de votre rendez-vous doit <strong>obligatoirement être une copie conforme légalisée par l'APC (Mairie)</strong>. Aucune photocopie simple non tamponnée n'est recevable.
+              </p>
+            </div>
+          </div>
+
+          <div className="grid grid-cols-1 gap-2.5">
+            {VERIFICATION_DOCUMENTS_DETAILED.map((doc) => (
+              <div key={doc.number} className="flex items-start gap-3 text-xs text-slate-800 bg-white p-3.5 rounded-2xl border border-indigo-100 shadow-xs">
+                <div className="w-6 h-6 rounded-full bg-indigo-100 text-indigo-700 font-bold flex items-center justify-center shrink-0 text-[11px] mt-0.5">
+                  {doc.number}
+                </div>
+                <div className="flex-1">
+                  <div className="flex items-center gap-2 flex-wrap">
+                    <strong className="text-slate-900 font-bold">{doc.title}</strong>
+                    <span className="text-[10px] px-2 py-0.5 bg-indigo-50 text-indigo-700 rounded-md font-bold">
+                      {doc.badge}
+                    </span>
+                  </div>
+                  <p className="text-slate-600 text-[11px] mt-0.5">
+                    {doc.subtitle}
+                  </p>
+                </div>
+              </div>
             ))}
-          </ul>
+          </div>
 
           <div className="pt-2 text-center">
             <Link

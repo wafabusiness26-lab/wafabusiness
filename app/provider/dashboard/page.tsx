@@ -98,10 +98,10 @@ export default function ProviderDashboardPage() {
               </div>
               <div className="space-y-1">
                 <h3 className="font-serif text-base font-bold text-[#422401]">
-                  Action requise : Contrôle de vos pièces originales en main propre
+                  Action requise : Contrôle de vos 7 pièces physiques en main propre
                 </h3>
                 <p className="text-xs text-on-surface-variant leading-relaxed">
-                  Votre profil est actuellement en attente de vérification physique. Le coordinateur doit inspecter votre pièce d'identité originale et vos diplômes au bureau d'Alger afin d'activer votre <strong>Sceau de Vérification Or</strong> et vous rendre visible dans le catalogue public.
+                  Votre profil est actuellement en attente de vérification physique. Le coordinateur doit inspecter votre dossier complet de 7 pièces (photocopies obligatoirement légalisées par l'APC) au bureau d'Alger afin d'activer votre <strong>Sceau de Vérification Or</strong> et vous rendre visible dans le catalogue public.
                 </p>
               </div>
             </div>
@@ -111,7 +111,7 @@ export default function ProviderDashboardPage() {
                 href="/provider/verification"
                 className="px-5 py-2.5 bg-tertiary hover:bg-tertiary-container text-white text-xs font-bold rounded-2xl shadow-xs transition text-center"
               >
-                Consulter la checklist des documents originaux
+                Consulter la checklist des 7 pièces légalisées
               </Link>
             </div>
           </div>

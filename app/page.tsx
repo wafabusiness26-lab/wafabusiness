@@ -256,7 +256,7 @@ export default function HomePage() {
                 100% Vérification en Main Propre
               </h3>
               <p className="text-xs text-on-surface-variant leading-relaxed">
-                Chaque nounou et tuteur est rencontré en personne au bureau d'Alger. CNI, casier judiciaire et diplômes originaux sont méticuleusement contrôlés.
+                Chaque nounou et tuteur est rencontré en personne au bureau d'Alger. Le dossier officiel de 7 pièces (photocopies obligatoirement légalisées en mairie) est méticuleusement contrôlé.
               </p>
             </div>
 
@@ -610,7 +610,7 @@ export default function HomePage() {
             {[
               {
                 q: 'Comment sont vérifiées les pièces d\'identité et les diplômes ?',
-                a: 'Chaque prestataire se présente physiquement à notre bureau d\'Alger avec ses originaux (Carte Nationale d\'Identité biométrique, extrait de casier judiciaire bulletin n°3, diplômes ou attestations). Aucun document n\'est numérisé ni téléversé sur Internet.'
+                a: 'Chaque prestataire se présente physiquement à notre bureau d\'Alger avec son dossier complet de 7 pièces (photocopies obligatoirement légalisées par l\'APC : pièce d\'identité, extrait de naissance, fiche familiale, certificat de résidence, casier judiciaire B3, 3 photos, diplôme). Aucun document n\'est numérisé ni téléversé sur Internet.'
               },
               {
                 q: 'Pourquoi n\'y a-t-il aucun paiement par carte bancaire sur le site ?',

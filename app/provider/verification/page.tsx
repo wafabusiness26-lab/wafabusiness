@@ -5,7 +5,7 @@ import Link from 'next/link';
 import { useAuth } from '@/lib/auth-context';
 import { VerificationBadge } from '@/components/VerificationBadge';
 import { AdminCallCard } from '@/components/AdminCallCard';
-import { PHYSICAL_CHECKLIST, ADMIN_CONTACT } from '@/lib/constants';
+import { PHYSICAL_CHECKLIST, VERIFICATION_DOCUMENTS_DETAILED, LEGALIZATION_NOTICE, ADMIN_CONTACT } from '@/lib/constants';
 
 export default function ProviderVerificationPage() {
   const { profile } = useAuth();
@@ -72,28 +72,69 @@ export default function ProviderVerificationPage() {
           )}
         </div>
 
-        {/* Checklist des documents originaux à préparer */}
+        {/* Checklist des 7 documents physiques à préparer */}
         <div className="bg-surface-container-lowest rounded-3xl border border-[#ded7ca] p-6 sm:p-8 shadow-sm space-y-5">
-          <div className="flex items-center gap-2 font-serif font-bold text-base text-on-surface">
-            <span className="material-symbols-outlined text-primary text-xl">fact_check</span>
-            <span>Documents originaux à présenter lors de votre visite</span>
+          <div className="flex items-center justify-between gap-2 flex-wrap">
+            <div className="flex items-center gap-2 font-serif font-bold text-base text-on-surface">
+              <span className="material-symbols-outlined text-primary text-xl">fact_check</span>
+              <span>Dossier physique d'agrément (7 pièces obligatoires)</span>
+            </div>
+            <span className="px-3 py-1 rounded-full bg-primary-fixed/50 text-primary text-xs font-bold">
+              Contrôle en main propre
+            </span>
           </div>
 
           <p className="text-xs text-on-surface-variant leading-relaxed">
-            Lors de votre entretien de 15 minutes avec l'administrateur, vous devez présenter les pièces originales suivantes (aucune copie numérique n'est conservée sur le web) :
+            Lors de votre entretien de 15 minutes avec l'administrateur au bureau d'Alger, vous devez présenter le dossier complet comprenant les 7 pièces suivantes :
           </p>
 
+          {/* Note persistante obligatoire sur les copies légalisées */}
+          <div className="p-4 rounded-2xl bg-[#fcf8ee] border border-[#D4A373] flex items-start gap-3 text-xs text-[#7d562d]">
+            <span className="material-symbols-outlined text-[#8c5828] text-xl material-symbols-fill shrink-0 mt-0.5">
+              gavel
+            </span>
+            <div className="space-y-1">
+              <strong className="block text-sm text-[#422401] font-bold">
+                Règle d'Agrément Impérative : Copies Légalisées
+              </strong>
+              <p className="text-on-surface-variant leading-relaxed text-[11px]">
+                Chaque photocopie présentée doit <strong>obligatoirement être une copie conforme légalisée par l'APC (Mairie)</strong>. Aucune photocopie simple non tamponnée n'est recevable pour l'attribution de votre badge officiel.
+              </p>
+            </div>
+          </div>
+
           <div className="space-y-3">
-            {PHYSICAL_CHECKLIST.map((item, idx) => (
-              <div key={idx} className="flex items-start gap-3 p-4 rounded-2xl bg-[#FAF8F5] border border-[#ded7ca] text-xs text-on-surface">
-                <div className="w-6 h-6 rounded-full bg-primary-fixed text-primary font-bold flex items-center justify-center shrink-0 text-[11px]">
-                  {idx + 1}
+            {VERIFICATION_DOCUMENTS_DETAILED.map((doc) => {
+              const isItemVerified = profile ? Boolean((profile as any)[doc.key]) : false;
+              return (
+                <div key={doc.number} className={`flex items-start gap-3.5 p-4 rounded-2xl border text-xs transition ${
+                  isItemVerified ? 'bg-secondary-fixed/20 border-secondary/40' : 'bg-[#FAF8F5] border-[#ded7ca]'
+                }`}>
+                  <div className={`w-7 h-7 rounded-full font-bold flex items-center justify-center shrink-0 text-xs mt-0.5 ${
+                    isItemVerified ? 'bg-secondary text-white' : 'bg-primary-fixed text-primary'
+                  }`}>
+                    {isItemVerified ? (
+                      <span className="material-symbols-outlined text-sm material-symbols-fill">check</span>
+                    ) : (
+                      doc.number
+                    )}
+                  </div>
+                  <div className="flex-1 space-y-0.5">
+                    <div className="flex items-center gap-2 flex-wrap">
+                      <strong className="text-on-surface font-bold text-xs sm:text-sm">{doc.title}</strong>
+                      <span className={`text-[10px] px-2 py-0.5 rounded-md font-bold ${
+                        isItemVerified ? 'bg-secondary-fixed text-secondary' : 'bg-[#ede8df] text-on-surface-variant'
+                      }`}>
+                        {isItemVerified ? 'Vérifié au bureau' : doc.badge}
+                      </span>
+                    </div>
+                    <p className="text-on-surface-variant text-[11px] leading-relaxed">
+                      {doc.subtitle}
+                    </p>
+                  </div>
                 </div>
-                <div className="flex-1">
-                  <strong className="block text-on-surface font-semibold">{item}</strong>
-                </div>
-              </div>
-            ))}
+              );
+            })}
           </div>
         </div>
 

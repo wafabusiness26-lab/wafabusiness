@@ -107,6 +107,11 @@ export class DataStore {
       created_at: current?.created_at || new Date().toISOString(),
       verification_status: profile.verification_status ?? current?.verification_status ?? (profile.role === 'provider' ? 'en_attente_physique' : 'non_verifie'),
       id_card_verified: profile.id_card_verified ?? current?.id_card_verified ?? false,
+      birth_certificate_verified: profile.birth_certificate_verified ?? current?.birth_certificate_verified ?? false,
+      family_record_verified: profile.family_record_verified ?? current?.family_record_verified ?? false,
+      residence_certificate_verified: profile.residence_certificate_verified ?? current?.residence_certificate_verified ?? false,
+      criminal_record_verified: profile.criminal_record_verified ?? current?.criminal_record_verified ?? false,
+      photos_verified: profile.photos_verified ?? current?.photos_verified ?? false,
       diploma_verified: profile.diploma_verified ?? current?.diploma_verified ?? false,
       admin_verification_date: profile.admin_verification_date ?? current?.admin_verification_date ?? null,
       admin_verification_notes: profile.admin_verification_notes ?? current?.admin_verification_notes ?? null,
@@ -153,7 +158,16 @@ export class DataStore {
   static async updateVerificationStatus(
     providerId: string, 
     status: VerificationStatus,
-    checklist?: { id_card_verified?: boolean; diploma_verified?: boolean; notes?: string }
+    checklist?: { 
+      id_card_verified?: boolean; 
+      birth_certificate_verified?: boolean;
+      family_record_verified?: boolean;
+      residence_certificate_verified?: boolean;
+      criminal_record_verified?: boolean;
+      photos_verified?: boolean;
+      diploma_verified?: boolean; 
+      notes?: string;
+    }
   ): Promise<boolean> {
     const profile = await this.getProfileById(providerId);
     if (!profile) return false;
@@ -162,6 +176,11 @@ export class DataStore {
       ...profile,
       verification_status: status,
       id_card_verified: checklist?.id_card_verified ?? profile.id_card_verified ?? false,
+      birth_certificate_verified: checklist?.birth_certificate_verified ?? profile.birth_certificate_verified ?? false,
+      family_record_verified: checklist?.family_record_verified ?? profile.family_record_verified ?? false,
+      residence_certificate_verified: checklist?.residence_certificate_verified ?? profile.residence_certificate_verified ?? false,
+      criminal_record_verified: checklist?.criminal_record_verified ?? profile.criminal_record_verified ?? false,
+      photos_verified: checklist?.photos_verified ?? profile.photos_verified ?? false,
       diploma_verified: checklist?.diploma_verified ?? profile.diploma_verified ?? false,
       admin_verification_notes: checklist?.notes ?? profile.admin_verification_notes ?? null,
       admin_verification_date: status === 'verifie_en_main_propre' ? new Date().toISOString() : profile.admin_verification_date,
