@@ -366,15 +366,15 @@ export default function AdminDashboardPage() {
                           <div className="flex items-center justify-between">
                             <div>
                               <strong className="font-serif text-sm text-on-surface block">
-                                {client?.full_name || 'Client Famille'}
+                                {req.client_name || client?.full_name || 'Client Famille'}
                               </strong>
                               <span className="text-xs text-on-surface-variant">
-                                {client?.phone || 'Téléphone non précisé'}
+                                {req.client_phone || client?.phone || 'Téléphone non précisé'}
                               </span>
                             </div>
-                            {client?.phone && (
+                            {(req.client_phone || client?.phone) && (
                               <a
-                                href={`tel:${client.phone}`}
+                                href={`tel:${req.client_phone || client?.phone}`}
                                 className="px-3.5 py-1.5 rounded-xl bg-primary hover:bg-primary-600 text-white text-xs font-bold flex items-center gap-1 shadow-xs transition"
                               >
                                 <span className="material-symbols-outlined text-sm">call</span>
