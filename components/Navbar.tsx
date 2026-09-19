@@ -113,7 +113,7 @@ export const Navbar: React.FC = () => {
         <div className="h-16 sm:h-20 max-w-7xl mx-auto px-3 sm:px-6 lg:px-8 flex items-center justify-between gap-2 sm:gap-4 relative">
           {/* Logo */}
           <Link href="/" className="flex items-center gap-2 sm:gap-3 shrink-0 group">
-            <Logo className="h-8 sm:h-10 w-auto group-hover:scale-102 transition-transform" />
+            <Logo animatedEvery10s={true} className="h-10 sm:h-14 w-auto group-hover:scale-102 transition-transform" />
           </Link>
 
           {/* Desktop Organic Nav Pills (Visible on large screens) */}
