@@ -63,6 +63,7 @@ export const Logo: React.FC<LogoProps> = ({
         alt="Amana — Vos enfants entre de bonnes mains"
         className={`${className} object-contain select-none`}
         loading="eager"
+        style={variant === 'white' ? undefined : { mixBlendMode: 'multiply' }}
       />
     </div>
   );
