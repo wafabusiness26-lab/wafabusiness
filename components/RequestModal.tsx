@@ -60,21 +60,40 @@ export const RequestModal: React.FC<RequestModalProps> = ({
 
     try {
       if (profile && clientPhone && clientPhone !== profile.phone) {
-        await DataStore.saveProfile({ ...profile, phone: clientPhone });
+        try {
+          await DataStore.saveProfile({ ...profile, phone: clientPhone });
+        } catch (pErr) {
+          console.warn('Notice mise à jour téléphone profil:', pErr);
+        }
       }
 
       const combinedDatetime = new Date(`${preferredDate}T${preferredTime}:00`).toISOString();
 
-      await DataStore.createRequest({
-        client_id: profile?.id || user?.id || 'usr_client_guest',
+      // Vérifier si l'utilisateur possède un UUID Supabase valide
+      const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+      const validClientId = (user?.id && uuidRegex.test(user.id)) 
+        ? user.id 
+        : (profile?.id && uuidRegex.test(profile.id)) 
+          ? profile.id 
+          : null;
+
+      const created = await DataStore.createRequest({
+        client_id: validClientId,
+        client_name: profile?.full_name || 'Client TataWafa',
+        client_phone: clientPhone.trim(),
         listing_id: listing.id,
         requested_datetime: combinedDatetime,
         note: note.trim() || undefined,
       });
 
+      if (!created || !created.id) {
+        throw new Error("Échec d'enregistrement : la base de données n'a retourné aucun identifiant.");
+      }
+
       setSuccess(true);
       onRequestSubmitted?.();
     } catch (err: any) {
+      console.error('Erreur soumission RequestModal:', err);
       setError(err.message || 'Une erreur est survenue lors de l\'envoi de votre demande.');
     } finally {
       setSubmitting(false);

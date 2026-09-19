@@ -36,7 +36,54 @@ export default function BookingConfirmationPage() {
         <span className="material-symbols-outlined text-3xl text-primary animate-spin">
           progress_activity
         </span>
-        <p className="text-xs text-on-surface-variant">Chargement du bon de confirmation...</p>
+        <p className="text-xs text-on-surface-variant">Vérification de l'enregistrement en base de données...</p>
+      </div>
+    );
+  }
+
+  if (!request) {
+    return (
+      <div className="w-full bg-[#FAF8F5] min-h-screen py-16 px-4 sm:px-6 lg:px-8 flex items-center justify-center">
+        <div className="max-w-md w-full bg-surface-container-lowest rounded-3xl p-8 border border-red-200 shadow-sm text-center space-y-5">
+          <div className="w-16 h-16 bg-red-100 text-red-600 rounded-2xl flex items-center justify-center mx-auto shadow-xs">
+            <span className="material-symbols-outlined text-3xl">error</span>
+          </div>
+
+          <div className="space-y-2">
+            <h1 className="font-serif text-xl font-bold text-on-surface">
+              Dossier ou Demande Introuvable
+            </h1>
+            <p className="text-xs text-on-surface-variant leading-relaxed">
+              La demande <strong className="text-on-surface">#{id || 'inconnue'}</strong> n'a pas pu être trouvée dans la base de données Supabase. L'enregistrement n'a pas été confirmé ou la demande n'a pas pu être insérée.
+            </p>
+          </div>
+
+          <div className="p-3.5 bg-amber-50 rounded-2xl border border-amber-200 text-left space-y-1">
+            <div className="text-xs font-bold text-amber-900 flex items-center gap-1">
+              <span className="material-symbols-outlined text-sm">shield</span>
+              <span>Intégrité des données TataWafa</span>
+            </div>
+            <p className="text-[11px] text-amber-800 leading-relaxed">
+              Pour votre sécurité, un bon officiel n'est jamais affiché sans validation physique de l'écriture en base de données.
+            </p>
+          </div>
+
+          <div className="pt-2 flex flex-col gap-2.5">
+            <Link
+              href="/#services"
+              className="w-full py-3 rounded-2xl bg-primary hover:bg-primary-600 text-white font-bold text-xs shadow-xs transition"
+            >
+              Retour au catalogue des prestataires
+            </Link>
+            <a
+              href={`tel:${ADMIN_CONTACT.phone}`}
+              className="w-full py-3 rounded-2xl bg-[#FAF8F5] hover:bg-[#ede8df] text-on-surface font-semibold text-xs border border-[#ded7ca] transition flex items-center justify-center gap-1.5"
+            >
+              <span className="material-symbols-outlined text-sm">phone</span>
+              <span>Contacter le coordinateur ({ADMIN_CONTACT.phone})</span>
+            </a>
+          </div>
+        </div>
       </div>
     );
   }

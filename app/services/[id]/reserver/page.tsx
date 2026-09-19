@@ -115,23 +115,39 @@ export default function BookServicePage() {
     setError(null);
 
     try {
+      const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+      const validClientId = (user?.id && uuidRegex.test(user.id)) 
+        ? user.id 
+        : (profile?.id && uuidRegex.test(profile.id)) 
+          ? profile.id 
+          : null;
+
       // Create request in store
       const newRequest = await DataStore.createRequest({
         listing_id: id,
-        client_id: user?.id || 'guest-' + Date.now(),
+        client_id: validClientId,
+        client_name: clientName.trim(),
+        client_phone: clientPhone.trim(),
         requested_datetime: `${startDate || new Date().toISOString().split('T')[0]} 14:00`,
         child_count: childCount,
         child_age_or_grade: childAge,
         address_details: `${commune}, ${addressDetails}`,
-        note: `${specialNotes} (Contact: ${clientName} - ${clientPhone} | Formule: ${formula})`,
+        note: specialNotes.trim() ? `${specialNotes.trim()} (Formule: ${formula})` : `Formule: ${formula}`,
         duration_hours: formula === 'monthly' ? 80 : 2
       });
 
+      if (!newRequest || !newRequest.id) {
+        throw new Error("La base de données n'a retourné aucun identifiant de confirmation pour cette demande.");
+      }
+
       router.push(`/confirmation/${newRequest.id}`);
     } catch (err: any) {
-      console.error(err);
+      console.error('Erreur réservation:', err);
       setError(err?.message || 'Une erreur est survenue lors de l\'enregistrement.');
       setSubmitting(false);
+      if (typeof window !== 'undefined') {
+        window.scrollTo({ top: 250, behavior: 'smooth' });
+      }
     }
   };
 
@@ -623,6 +639,17 @@ export default function BookServicePage() {
                       Vous ne payez rien aujourd'hui. Le coordinateur vous contacte d'abord par téléphone pour valider l'adéquation du profil et organiser la première prise de contact.
                     </p>
                   </div>
+
+                  {/* Error Alert on Step 3 directly above submit button */}
+                  {error && (
+                    <div className="p-4 rounded-2xl bg-error-container text-on-error-container text-xs font-semibold flex items-start gap-3 border border-red-300">
+                      <span className="material-symbols-outlined text-lg text-error mt-0.5 shrink-0">error</span>
+                      <div className="space-y-1">
+                        <div className="font-bold text-sm">Échec de transmission de la demande :</div>
+                        <div className="text-xs font-normal leading-relaxed">{error}</div>
+                      </div>
+                    </div>
+                  )}
 
                   <div className="pt-4 flex items-center justify-between">
                     <button

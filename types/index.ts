@@ -57,13 +57,15 @@ export interface ServiceListing {
 
 export interface ServiceRequest {
   id: string;
-  client_id: string;
+  client_id: string | null;
   listing_id: string;
   requested_datetime: string;
   note: string | null;
   status: RequestStatus;
   created_at: string;
   // Détails enrichis de la demande
+  client_name?: string | null;
+  client_phone?: string | null;
   child_count?: number;
   child_age_or_grade?: string;
   address_details?: string;

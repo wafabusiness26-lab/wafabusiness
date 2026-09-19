@@ -519,15 +519,47 @@ export class DataStore {
   }
 
   static async getRequestById(id: string): Promise<ServiceRequest | null> {
+    if (isSupabaseConfigured()) {
+      const supabase = createClient();
+      if (supabase) {
+        try {
+          const { data, error } = await supabase
+            .from('requests')
+            .select(`
+              *,
+              client:profiles(*),
+              listing:service_listings(
+                *,
+                provider:profiles(*)
+              ),
+              review:reviews(*)
+            `)
+            .eq('id', id)
+            .maybeSingle();
+
+          if (error) {
+            console.error('Supabase getRequestById error:', error);
+          }
+          if (data) {
+            return data as ServiceRequest;
+          }
+        } catch (err) {
+          console.error('Supabase getRequestById exception:', err);
+        }
+      }
+    }
+
     const all = await this.getRequests();
     return all.find(r => r.id === id) || null;
   }
 
   static async createRequest(data: {
-    client_id: string;
+    client_id?: string | null;
     listing_id: string;
     requested_datetime: string;
     note?: string;
+    client_name?: string;
+    client_phone?: string;
     child_count?: number;
     child_age_or_grade?: string;
     address_details?: string;
@@ -535,62 +567,73 @@ export class DataStore {
   }): Promise<ServiceRequest> {
     if (isSupabaseConfigured()) {
       const supabase = createClient();
-      if (!supabase) throw new Error('Client Supabase inaccessible.');
+      if (!supabase) {
+        throw new Error('Client Supabase inaccessible : vérifiez vos identifiants.');
+      }
+
+      // Valider si client_id est un UUID Supabase valide, sinon null (ex: invités)
+      const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+      const validClientId = (data.client_id && uuidRegex.test(data.client_id)) ? data.client_id : null;
 
       const payload: any = {
-        client_id: data.client_id,
         listing_id: data.listing_id,
         requested_datetime: data.requested_datetime,
-        note: data.note,
+        note: data.note || null,
         status: 'new',
+        child_count: Math.max(1, data.child_count || 1),
+        duration_hours: data.duration_hours && data.duration_hours > 0 ? data.duration_hours : 2,
       };
-      if (data.child_count) payload.child_count = data.child_count;
+
+      if (validClientId) payload.client_id = validClientId;
+      if (data.client_name) payload.client_name = data.client_name;
+      if (data.client_phone) payload.client_phone = data.client_phone;
       if (data.child_age_or_grade) payload.child_age_or_grade = data.child_age_or_grade;
       if (data.address_details) payload.address_details = data.address_details;
-      if (data.duration_hours) payload.duration_hours = data.duration_hours;
 
-      let { data: created, error } = await supabase.from('requests').insert(payload).select().single();
+      let { data: created, error } = await supabase.from('requests').insert([payload]).select().single();
 
-      // En cas de colonne manquante dans l'ancien schéma Supabase, repli propre avec données dans le champ note
-      if (error && (error.message?.includes('column') || error.message?.includes('schema cache'))) {
-        console.warn('Repli création de demande (schéma minimal):', error.message);
-        const minimalPayload = {
-          client_id: data.client_id,
+      // En cas de colonne manquante dans un schéma Supabase non migré, repli propre
+      if (error && (error.message?.includes('column') || error.code === 'PGRST204')) {
+        console.warn('Repli création de demande (schéma minimal sans colonnes secondaires):', error.message);
+        const minimalPayload: any = {
           listing_id: data.listing_id,
           requested_datetime: data.requested_datetime,
-          note: `${data.note || ''} (Enfants: ${data.child_count || 1} - ${data.child_age_or_grade || ''} | Adresse: ${data.address_details || ''})`,
+          note: `${data.note || ''} | Contact: ${data.client_name || ''} (${data.client_phone || ''}) | Enfants: ${data.child_count || 1} (${data.child_age_or_grade || ''}) | Adresse: ${data.address_details || ''}`,
           status: 'new',
         };
-        const retry = await supabase.from('requests').insert(minimalPayload).select().single();
+        if (validClientId) minimalPayload.client_id = validClientId;
+        const retry = await supabase.from('requests').insert([minimalPayload]).select().single();
         created = retry.data;
         error = retry.error;
       }
 
+      // Vérification explicite et stricte de la réponse Supabase
       if (error) {
-        console.error('Supabase createRequest error:', error);
-        throw error;
+        console.error('Supabase createRequest error detail:', error);
+        if (error.code === '42501') {
+          throw new Error("Erreur de sécurité Supabase (RLS 42501) : La politique de sécurité de la table 'requests' a refusé l'insertion. Assurez-vous d'appliquer la politique autorisant les réservations (voir migration SQL).");
+        }
+        if (error.code === '22P02') {
+          throw new Error(`Erreur de format Supabase (22P02) : Syntaxe UUID invalide sur client_id ou listing_id (${error.message}).`);
+        }
+        if (error.code === '23503') {
+          throw new Error("Erreur de contrainte Supabase (23503) : Le prestataire (listing_id) ou le compte client (client_id) n'existe pas dans la base de données.");
+        }
+        if (error.code === '23514') {
+          throw new Error(`Erreur de contrainte Supabase CHECK (23514) : Statut ou données invalides (${error.message}).`);
+        }
+        throw new Error(`Échec d'enregistrement Supabase [${error.code || 'DB'}]: ${error.message || 'Erreur inconnue'}`);
       }
+
+      if (!created || !created.id) {
+        throw new Error("La base de données Supabase n'a retourné aucun enregistrement après l'insertion.");
+      }
+
       return created as ServiceRequest;
     }
 
-    // MODE TEST LOCAL HORS LIGNE UNIQUEMENT
-    const newReq: ServiceRequest = {
-      id: `req_${Date.now()}`,
-      client_id: data.client_id,
-      listing_id: data.listing_id,
-      requested_datetime: data.requested_datetime,
-      note: data.note || null,
-      status: 'new',
-      child_count: data.child_count || 1,
-      child_age_or_grade: data.child_age_or_grade || '',
-      address_details: data.address_details || '',
-      duration_hours: data.duration_hours || 2,
-      created_at: new Date().toISOString(),
-    };
-
-    const current = getLocal<ServiceRequest[]>(STORAGE_KEYS.REQUESTS, INITIAL_REQUESTS);
-    setLocal(STORAGE_KEYS.REQUESTS, [newReq, ...current]);
-    return newReq;
+    // Avertissement explicite si Supabase n'est pas configuré : NE JAMAIS masquér l'absence de base de données
+    throw new Error("Supabase n'est pas configuré dans votre fichier .env.local (NEXT_PUBLIC_SUPABASE_URL est vide). Veuillez renseigner vos identifiants Supabase pour enregistrer vos demandes.");
   }
 
   static async updateRequestStatus(requestId: string, status: RequestStatus, adminNotes?: string): Promise<boolean> {
@@ -829,7 +872,7 @@ export class DataStore {
     return reviews.map(rev => {
       const req = requestMap.get(rev.request_id);
       const listing = req ? listingMap.get(req.listing_id) : undefined;
-      const client = req ? profileMap.get(req.client_id) : undefined;
+      const client = (req && req.client_id) ? profileMap.get(req.client_id) : undefined;
       const provider = listing ? profileMap.get(listing.provider_id) : undefined;
 
       return {

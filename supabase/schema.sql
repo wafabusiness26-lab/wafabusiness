@@ -50,7 +50,7 @@ create table if not exists public.service_listings (
 -- 4. TABLE REQUESTS (Demandes de réservations des familles)
 create table if not exists public.requests (
   id uuid default gen_random_uuid() primary key,
-  client_id uuid references public.profiles(id) on delete cascade not null,
+  client_id uuid references public.profiles(id) on delete set null,
   listing_id uuid references public.service_listings(id) on delete cascade not null,
   requested_datetime timestamptz not null,
   note text,
@@ -62,7 +62,10 @@ create table if not exists public.requests (
   address_details text,
   duration_hours numeric default 2 check (duration_hours > 0),
   admin_notes text,
-  created_at timestamptz default now()
+  created_at timestamptz default now(),
+  constraint requests_client_contact_check check (
+    client_id is not null or (client_name is not null and client_phone is not null)
+  )
 );
 
 -- 5. TABLE REVIEWS (Avis et Évaluations certifiés post-prestation)
@@ -269,7 +272,13 @@ create policy "admin full access to listings" on public.service_listings
 -- ------------------------------------------------------------------------------
 drop policy if exists "clients see own requests" on public.requests;
 create policy "clients see own requests" on public.requests 
-  for select using (client_id = auth.uid());
+  for select using (
+    (auth.uid() is not null and client_id = auth.uid())
+    or
+    (client_id is null)
+    or
+    public.is_admin()
+  );
 
 drop policy if exists "providers see their requests" on public.requests;
 create policy "providers see their requests" on public.requests 
@@ -281,19 +290,22 @@ create policy "providers see their requests" on public.requests
   );
 
 drop policy if exists "clients create requests" on public.requests;
--- Les clients créent leurs demandes obligatoirement avec le statut 'new'
+-- Les familles créent leurs demandes (connectées ou avec coordonnées de contact direct)
 create policy "clients create requests" on public.requests 
   for insert with check (
-    client_id = auth.uid() 
-    and (status = 'new' or status is null)
+    (auth.uid() is not null and (client_id = auth.uid() or client_id is null) and (status = 'new' or status is null))
+    or
+    (client_name is not null and client_phone is not null and (status = 'new' or status is null))
   );
 
 drop policy if exists "clients cancel own requests" on public.requests;
 create policy "clients cancel own requests" on public.requests 
   for update using (
-    client_id = auth.uid() and status = 'new'
+    (auth.uid() is not null and client_id = auth.uid() and status = 'new')
+    or
+    public.is_admin()
   ) with check (
-    status = 'cancelled'
+    status = 'cancelled' or public.is_admin()
   );
 
 drop policy if exists "admin full access to requests" on public.requests;
