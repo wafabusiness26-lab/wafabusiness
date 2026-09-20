@@ -1,5 +1,5 @@
 -- ==============================================================================
--- Plateforme TataWafa (Wilaya d'Alger, Algérie)
+-- Plateforme Amana (Wilaya d'Alger, Algérie)
 -- Schéma PostgreSQL Supabase Hardened & Sécurisé (RLS Audité)
 -- ==============================================================================
 
@@ -156,7 +156,7 @@ begin
       when new.raw_user_meta_data->>'role' in ('client', 'provider') then new.raw_user_meta_data->>'role'
       else 'client' -- Empêche l'auto-attribution du rôle admin lors du signup
     end,
-    coalesce(new.raw_user_meta_data->>'full_name', 'Utilisateur TataWafa'),
+    coalesce(new.raw_user_meta_data->>'full_name', 'Utilisateur Amana'),
     new.raw_user_meta_data->>'phone',
     coalesce(new.raw_user_meta_data->>'location', 'Alger Centre'),
     case 

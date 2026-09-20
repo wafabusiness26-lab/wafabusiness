@@ -124,7 +124,7 @@ export default function AdminPrestatairesPage() {
         </div>
         <h2 className="font-serif text-2xl font-bold text-on-surface">Accès Administrateur Restreint</h2>
         <p className="text-xs sm:text-sm text-on-surface-variant max-w-md mx-auto">
-          Réservé exclusivement au coordinateur agréé de TataWafa.
+          Réservé exclusivement au coordinateur agréé d'Amana.
         </p>
       </div>
     );

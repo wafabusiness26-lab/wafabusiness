@@ -139,7 +139,7 @@ export const Footer: React.FC = () => {
 
         {/* Bottom Legal & Guarantees */}
         <div className="pt-8 flex flex-col sm:flex-row items-center justify-between text-[11px] text-[#899cae] gap-4">
-          <p>© {new Date().getFullYear()} TataWafa. Tous droits réservés • Wilaya d'Alger, Algérie.</p>
+          <p>© {new Date().getFullYear()} Amana. Tous droits réservés • Wilaya d'Alger, Algérie.</p>
           <div className="flex flex-wrap items-center gap-3">
             <span className="flex items-center gap-1 text-[#c6ebd7]">
               <span className="material-symbols-outlined text-[14px]">shield</span>

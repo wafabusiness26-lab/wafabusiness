@@ -35,7 +35,7 @@ export default function ContactPage() {
           Permanence & Écoute
         </span>
         <h1 className="text-3xl sm:text-5xl font-black text-slate-900 tracking-tight">
-          Contacter l'Équipe TataWafa
+          Contacter l'Équipe Amana
         </h1>
         <p className="text-sm sm:text-base text-slate-600 leading-relaxed">
           Notre coordinateur de plateforme est à votre disposition par téléphone, WhatsApp ou directement à notre permanence d'Alger Centre.

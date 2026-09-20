@@ -306,7 +306,7 @@ export const Navbar: React.FC = () => {
                       Menu des 5 Pages
                     </h3>
                     <p className="text-[11px] text-on-surface-variant leading-none mt-0.5">
-                      Wilaya d'Alger • TataWafa
+                      Wilaya d'Alger • Amana
                     </p>
                   </div>
                 </div>
@@ -331,7 +331,7 @@ export const Navbar: React.FC = () => {
               >
                 <div className="flex items-center gap-2">
                   <span className="material-symbols-outlined text-[17px]">home</span>
-                  <span>Accueil TataWafa</span>
+                  <span>Accueil Amana</span>
                 </div>
                 <span className="text-[10px] text-outline font-medium">Page d'accueil</span>
               </Link>

@@ -55,7 +55,7 @@ export default function AdminReviewsModerationPage() {
         </div>
         <h2 className="font-serif text-2xl font-bold text-on-surface">Accès Administrateur Requis</h2>
         <p className="text-xs sm:text-sm text-on-surface-variant max-w-md mx-auto">
-          Cet espace de modération est exclusivement réservé au coordinateur de la plateforme TataWafa.
+          Cet espace de modération est exclusivement réservé au coordinateur de la plateforme Amana.
         </p>
       </div>
     );

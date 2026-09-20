@@ -194,7 +194,7 @@ export default function ProviderAnnoncesPage() {
           <div className="bg-slate-50 border border-slate-200 rounded-2xl p-6 text-left max-w-xl mx-auto space-y-3">
             <div className="flex items-center gap-2 text-indigo-900 font-bold text-xs uppercase tracking-wide">
               <PhoneCall className="w-4 h-4 text-indigo-600" />
-              <span>Contact direct coordinateur TataWafa</span>
+              <span>Contact direct coordinateur Amana</span>
             </div>
             <p className="text-xs text-slate-600 leading-relaxed">
               L'administrateur va vous appeler au <strong>{phone}</strong> pour valider votre dossier en personne. Vous pouvez également le joindre directement au :

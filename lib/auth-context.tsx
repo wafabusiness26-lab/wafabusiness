@@ -327,7 +327,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     }
 
     if (typeof window !== 'undefined') localStorage.setItem('sm_current_user_id', target.id);
-    setUser({ id: target.id, email: `${targetRole}@tatawafa.dz` });
+    setUser({ id: target.id, email: `${targetRole}@amana.dz` });
     setProfile(target);
     setRole(target.role);
     setLoading(false);

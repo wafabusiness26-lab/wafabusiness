@@ -61,7 +61,7 @@ export default function BookingConfirmationPage() {
           <div className="p-3.5 bg-amber-50 rounded-2xl border border-amber-200 text-left space-y-1">
             <div className="text-xs font-bold text-amber-900 flex items-center gap-1">
               <span className="material-symbols-outlined text-sm">shield</span>
-              <span>Intégrité des données TataWafa</span>
+              <span>Intégrité des données Amana</span>
             </div>
             <p className="text-[11px] text-amber-800 leading-relaxed">
               Pour votre sécurité, un bon officiel n'est jamais affiché sans validation physique de l'écriture en base de données.
@@ -199,7 +199,7 @@ export default function BookingConfirmationPage() {
               href="/"
               className="text-xs text-on-surface-variant hover:text-primary font-semibold transition"
             >
-              ← Retour à l'accueil TataWafa
+              ← Retour à l'accueil Amana
             </Link>
           </div>
 

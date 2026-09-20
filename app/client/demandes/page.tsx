@@ -113,7 +113,7 @@ export default function ClientRequestsPage() {
             <h3 className="font-serif text-lg font-bold text-on-surface">Aucune demande trouvée</h3>
             <p className="text-xs text-on-surface-variant leading-relaxed">
               {filterStatus === 'all'
-                ? "Vous n'avez pas encore transmis de demande de garde sur TataWafa."
+                ? "Vous n'avez pas encore transmis de demande de garde sur Amana."
                 : `Aucune demande correspondant à ce filtre.`}
             </p>
             <div className="pt-2">

@@ -27,7 +27,7 @@ export default function FAQPage() {
           Foire Aux Questions
         </h1>
         <p className="text-sm sm:text-base text-slate-600 leading-relaxed">
-          Toutes les réponses à vos questions sur le fonctionnement de TataWafa à Alger, la vérification physique des intervenants et le règlement en espèces.
+          Toutes les réponses à vos questions sur le fonctionnement d'Amana à Alger, la vérification physique des intervenants et le règlement en espèces.
         </p>
 
         {/* Barre de recherche FAQ */}

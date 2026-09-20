@@ -27,7 +27,7 @@ export default function HowItWorksPage() {
           Transparence & Simplicité
         </span>
         <h1 className="text-3xl sm:text-5xl font-black text-slate-900 tracking-tight">
-          Comment fonctionne TataWafa ?
+          Comment fonctionne Amana ?
         </h1>
         <p className="text-sm sm:text-base text-slate-600 leading-relaxed">
           Un modèle conçu spécialement pour Alger : allier la modernité de la recherche locale à la sécurité irremplaçable du contact humain et de la vérification de main à main.
@@ -126,7 +126,7 @@ export default function HowItWorksPage() {
             href="/devenir-prestataire"
             className="inline-flex items-center gap-2 px-6 py-3 bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs rounded-xl shadow-md transition"
           >
-            <span>Devenir prestataire sur TataWafa</span>
+            <span>Devenir prestataire sur Amana</span>
             <ArrowRight className="w-4 h-4" />
           </Link>
         </div>

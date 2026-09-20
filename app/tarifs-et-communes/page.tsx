@@ -33,7 +33,7 @@ export default function TarifsAndCommunesPage() {
           Les 57 Communes d'Alger & Grille Tarifaire en DA
         </h1>
         <p className="text-sm sm:text-base text-slate-600 leading-relaxed">
-          TataWafa dessert l'ensemble des communes de la Wilaya d'Alger avec des tarifs clairs, transparents et réglés directement en espèces de main à main.
+          Amana dessert l'ensemble des communes de la Wilaya d'Alger avec des tarifs clairs, transparents et réglés directement en espèces de main à main.
         </p>
       </div>
 

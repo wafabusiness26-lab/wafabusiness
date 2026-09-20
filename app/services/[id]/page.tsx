@@ -211,7 +211,7 @@ export default function ServiceDetailPage() {
               <div className="p-4 rounded-2xl bg-[#f4f1ea]/80 border border-[#ded7ca] space-y-1">
                 <div className="flex items-center gap-1.5 text-secondary font-bold text-xs">
                   <span className="material-symbols-outlined text-base material-symbols-fill">shield_with_heart</span>
-                  <span>Charte de Sérénité TataWafa</span>
+                  <span>Charte de Sérénité Amana</span>
                 </div>
                 <p className="text-xs text-on-surface-variant leading-relaxed">
                   Zéro document sensible stocké sur le cloud. Pièce d'identité biométrique et attestations d'expériences ont été inspectées en main propre dans nos bureaux d'Alger.

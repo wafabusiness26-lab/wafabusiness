@@ -61,14 +61,14 @@ export default function BecomeProviderPage() {
         </div>
       </section>
 
-      {/* Avantages TataWafa */}
+      {/* Avantages Amana */}
       <section className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         <div className="text-center max-w-2xl mx-auto mb-12 space-y-2">
           <span className="text-xs font-bold uppercase tracking-wider text-indigo-600 bg-indigo-50 px-3 py-1 rounded-full">
             Vos Avantages
           </span>
           <h2 className="text-2xl sm:text-3xl font-extrabold text-slate-900">
-            Pourquoi exercer sur la plateforme TataWafa ?
+            Pourquoi exercer sur la plateforme Amana ?
           </h2>
         </div>
 

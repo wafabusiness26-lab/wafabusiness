@@ -633,7 +633,7 @@ export default function BookServicePage() {
                   <div className="p-4 rounded-2xl bg-secondary-fixed/40 border border-secondary/30 text-xs space-y-1">
                     <div className="flex items-center gap-1.5 font-bold text-secondary">
                       <span className="material-symbols-outlined text-sm material-symbols-fill">check_circle</span>
-                      <span>Engagement de Sérénité TataWafa</span>
+                      <span>Engagement de Sérénité Amana</span>
                     </div>
                     <p className="text-on-surface-variant">
                       Vous ne payez rien aujourd'hui. Le coordinateur vous contacte d'abord par téléphone pour valider l'adéquation du profil et organiser la première prise de contact.

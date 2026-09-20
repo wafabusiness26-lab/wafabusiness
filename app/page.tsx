@@ -228,7 +228,7 @@ export default function HomePage() {
         </div>
       </section>
 
-      {/* 2. THE 4 GOLDEN PILLARS OF TRUST (CHARTE TATAWAFA) */}
+      {/* 2. THE 4 GOLDEN PILLARS OF TRUST (CHARTE AMANA) */}
       <section className="py-16 md:py-24 bg-[#ede8df]/50 border-y border-[#e4dec7]">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           
@@ -237,7 +237,7 @@ export default function HomePage() {
               Charte de Sérénité Familiale
             </span>
             <h2 className="font-serif text-2xl sm:text-4xl text-on-surface font-semibold tracking-tight">
-              Les 4 Piliers Inviolables de la Confiance TataWafa
+              Les 4 Piliers Inviolables de la Confiance Amana
             </h2>
             <p className="text-sm sm:text-base text-on-surface-variant leading-relaxed">
               Une sécurité absolue pensée pour la tranquillité des foyers algérois, sans intermédiaire opaque.
@@ -304,7 +304,7 @@ export default function HomePage() {
         </div>
       </section>
 
-      {/* 3. PROFILES PREVIEW: FEATURED TATAS VERIFIEES */}
+      {/* 3. PROFILES PREVIEW: FEATURED NOUNOUS VERIFIEES */}
       <section className="py-16 md:py-24">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           
@@ -314,7 +314,7 @@ export default function HomePage() {
                 {listings.length > 0 ? 'Sélection Rigoureuse de la Semaine' : 'Vérification Physique en Main Propre'}
               </span>
               <h2 className="font-serif text-2xl sm:text-4xl text-on-surface font-semibold tracking-tight">
-                {listings.length > 0 ? 'Tatas et Éducatrices Vedettes à Alger' : 'Services et Annonces à Alger'}
+                {listings.length > 0 ? 'Nounous et Éducatrices Vedettes à Alger' : 'Services et Annonces à Alger'}
               </h2>
               <p className="text-sm text-on-surface-variant">
                 {listings.length > 0
@@ -472,7 +472,7 @@ export default function HomePage() {
                   Du Cœur de la Baie aux Collines du Sahel Algérois
                 </h2>
                 <p className="text-xs sm:text-sm text-on-surface-variant leading-relaxed">
-                  TataWafa déploie des intervenantes de proximité directement dans votre quartier pour minimiser les temps de trajet et garantir une ponctualité exemplaire.
+                  Amana déploie des intervenantes de proximité directement dans votre quartier pour minimiser les temps de trajet et garantir une ponctualité exemplaire.
                 </p>
                 <div className="pt-2">
                   <Link
@@ -715,7 +715,7 @@ export default function HomePage() {
             </div>
 
             <p className="text-xs text-on-surface-variant leading-relaxed">
-              Personnalisez votre message pour le coordinateur TataWafa. Nous vous répondrons dans les plus brefs délais :
+              Personnalisez votre message pour le coordinateur Amana. Nous vous répondrons dans les plus brefs délais :
             </p>
 
             <textarea

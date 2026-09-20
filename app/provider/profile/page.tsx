@@ -119,7 +119,7 @@ export default function ProviderProfilePage() {
         <div className="text-xs text-amber-950 space-y-1">
           <h4 className="font-bold text-sm">Mode de fonctionnement des réservations</h4>
           <p className="text-amber-800 leading-relaxed">
-            Sur TataWafa, les demandes des familles sont transmises à l'administrateur. Vous serez contacté directement par téléphone (<strong>{profile?.phone || 'votre numéro'}</strong>) par l'administrateur pour organiser chaque mission.
+            Sur Amana, les demandes des familles sont transmises à l'administrateur. Vous serez contacté directement par téléphone (<strong>{profile?.phone || 'votre numéro'}</strong>) par l'administrateur pour organiser chaque mission.
           </p>
         </div>
       </div>

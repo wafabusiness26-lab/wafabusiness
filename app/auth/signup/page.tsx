@@ -100,7 +100,7 @@ export default function SignupPage() {
             <p className="leading-relaxed">
               1. Ouvrez votre messagerie et cliquez sur le lien d'activation reçu.<br />
               2. Pensez à vérifier vos <strong>courriers indésirables (spams)</strong> si l'e-mail tarde à apparaître.<br />
-              3. Revenez ensuite sur TataWafa pour vous connecter.
+              3. Revenez ensuite sur Amana pour vous connecter.
             </p>
           </div>
 
@@ -141,7 +141,7 @@ export default function SignupPage() {
           </Link>
           <div className="space-y-1">
             <h2 className="font-serif text-2xl sm:text-3xl font-bold text-on-surface tracking-tight">
-              Créer votre compte TataWafa
+              Créer votre compte Amana
             </h2>
             <p className="text-xs sm:text-sm text-on-surface-variant max-w-sm mx-auto">
               Rejoignez le réseau familial de confiance pour la garde d'enfants et les cours particuliers à Alger.
@@ -162,7 +162,7 @@ export default function SignupPage() {
           {/* Sélecteur de Rôle Organique */}
           <div className="space-y-2">
             <label className="block text-[11px] font-bold text-on-surface uppercase tracking-wider">
-              Vous rejoignez TataWafa en tant que :
+              Vous rejoignez Amana en tant que :
             </label>
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
               
@@ -326,7 +326,7 @@ export default function SignupPage() {
 
           </div>
 
-          {/* Rassurance Piliers TataWafa */}
+          {/* Rassurance Piliers Amana */}
           <div className="p-3.5 rounded-2xl bg-[#FAF8F5] border border-[#ebdcd4] flex items-center gap-3">
             <span className="material-symbols-outlined text-secondary text-xl shrink-0 material-symbols-fill">
               verified_user

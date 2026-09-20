@@ -58,7 +58,7 @@ export const ALGER_COMMUNES = [
 export type AlgerCommune = typeof ALGER_COMMUNES[number];
 
 export const ADMIN_CONTACT = {
-  name: 'Coordination TataWafa Alger',
+  name: 'Coordination Amana Alger',
   phone: '0782 37 43 37',
   phoneDisplay: '+213 (0) 782 37 43 37',
   whatsapp: 'https://wa.me/213782374337',
@@ -207,7 +207,7 @@ export const TARIFS_INDICATIFS = {
 
 export const FAQ_ITEMS = [
   {
-    q: 'Comment fonctionne la mise en relation sur TataWafa ?',
+    q: 'Comment fonctionne la mise en relation sur Amana ?',
     a: 'Vous choisissez un prestataire dans votre commune d\'Alger et soumettez votre demande avec vos créneaux souhaités. Notre coordinateur reçoit votre demande en direct, contacte le prestataire, puis vous appelle au téléphone pour confirmer l\'intervention.'
   },
   {
@@ -219,7 +219,7 @@ export const FAQ_ITEMS = [
     a: 'Le paiement est 100% direct et en espèces (Dinars Algériens - DA). Vous réglez directement le prestataire à votre domicile à la séance ou à la fin du mois selon l\'accord convenu.'
   },
   {
-    q: 'Comment devenir prestataire sur TataWafa ?',
+    q: 'Comment devenir prestataire sur Amana ?',
     a: 'Il vous suffit de créer votre compte et de remplir votre annonce de service (sans aucun document en ligne). L\'administrateur vous appellera ensuite pour fixer un rendez-vous à Alger et vérifier votre dossier officiel de 7 pièces légalisées en personne.'
   },
   {

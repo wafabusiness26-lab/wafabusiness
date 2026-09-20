@@ -79,7 +79,7 @@ export const RequestModal: React.FC<RequestModalProps> = ({
 
       const created = await DataStore.createRequest({
         client_id: validClientId,
-        client_name: profile?.full_name || 'Client TataWafa',
+        client_name: profile?.full_name || 'Client Amana',
         client_phone: clientPhone.trim(),
         listing_id: listing.id,
         requested_datetime: combinedDatetime,
