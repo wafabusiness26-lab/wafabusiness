@@ -19,12 +19,15 @@ import {
   ShieldCheck,
   FileCheck2,
   Coins,
-  ArrowLeft
+  ArrowLeft,
+  ArrowRight
 } from 'lucide-react';
 import Link from 'next/link';
+import { useRouter } from 'next/navigation';
 
 export default function ProviderAnnoncesPage() {
-  const { profile, user } = useAuth();
+  const router = useRouter();
+  const { profile, user, loading: authLoading } = useAuth();
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [submittedSuccess, setSubmittedSuccess] = useState(false);
@@ -43,9 +46,18 @@ export default function ProviderAnnoncesPage() {
   const [phone, setPhone] = useState(profile?.phone || '');
   const [photoUrl, setPhotoUrl] = useState('');
 
-  const providerId = profile?.id || user?.id || 'usr_provider_guest';
-
+  // 1. Redirection automatique si l'utilisateur n'est pas connecté
   useEffect(() => {
+    if (!authLoading && !user) {
+      router.replace('/auth/signup?role=provider');
+    }
+  }, [authLoading, user, router]);
+
+  // 2. Chargement de l'annonce existante pour l'utilisateur authentifié
+  useEffect(() => {
+    if (authLoading || !user) return;
+    const providerId = user.id;
+
     const loadListing = async () => {
       setLoading(true);
       try {
@@ -83,7 +95,7 @@ export default function ProviderAnnoncesPage() {
     };
 
     loadListing();
-  }, [providerId, profile]);
+  }, [user, authLoading, profile]);
 
   const toggleCommune = (commune: string) => {
     if (supportedCommunes.includes(commune)) {
@@ -97,6 +109,12 @@ export default function ProviderAnnoncesPage() {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+
+    if (!user) {
+      router.replace('/auth/signup?role=provider');
+      return;
+    }
+
     if (!phone) {
       setError('Veuillez renseigner votre numéro de téléphone afin que le coordinateur puisse vous joindre.');
       return;
@@ -116,7 +134,7 @@ export default function ProviderAnnoncesPage() {
 
       await DataStore.saveListing({
         id: listingId || undefined,
-        provider_id: providerId,
+        provider_id: user.id,
         category,
         title: title.trim(),
         description: description.trim(),
@@ -148,6 +166,40 @@ export default function ProviderAnnoncesPage() {
       'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=800&auto=format&fit=crop&q=80',
     ]
   };
+
+  if (authLoading) {
+    return (
+      <div className="min-h-[60vh] flex flex-col items-center justify-center gap-3">
+        <span className="material-symbols-outlined text-4xl text-primary animate-spin">
+          progress_activity
+        </span>
+        <p className="text-xs text-on-surface-variant font-medium">Vérification de votre session prestataire...</p>
+      </div>
+    );
+  }
+
+  if (!user) {
+    return (
+      <div className="max-w-md mx-auto my-16 p-8 bg-surface-container-lowest rounded-3xl border border-[#ded7ca] text-center space-y-4 shadow-sm">
+        <div className="w-12 h-12 bg-primary-fixed/40 text-primary rounded-2xl flex items-center justify-center mx-auto">
+          <span className="material-symbols-outlined text-2xl">account_circle</span>
+        </div>
+        <h2 className="font-serif text-xl font-bold text-on-surface">Compte Prestataire Requis</h2>
+        <p className="text-xs text-on-surface-variant leading-relaxed">
+          Vous devez être connecté à votre compte pour publier ou modifier votre annonce de service. Redirection en cours...
+        </p>
+        <div className="pt-2">
+          <Link
+            href="/auth/signup?role=provider"
+            className="inline-flex items-center gap-2 px-5 py-2.5 rounded-2xl bg-primary text-white text-xs font-bold hover:bg-primary-600 transition shadow-xs"
+          >
+            <span>Créer mon compte prestataire</span>
+            <ArrowRight className="w-4 h-4" />
+          </Link>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-10 space-y-8">

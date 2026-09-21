@@ -169,22 +169,49 @@ export class DataStore {
       notes?: string;
     }
   ): Promise<boolean> {
-    const profile = await this.getProfileById(providerId);
-    if (!profile) return false;
-
-    await this.saveProfile({
-      ...profile,
+    const updatePayload: any = {
       verification_status: status,
-      id_card_verified: checklist?.id_card_verified ?? profile.id_card_verified ?? false,
-      birth_certificate_verified: checklist?.birth_certificate_verified ?? profile.birth_certificate_verified ?? false,
-      family_record_verified: checklist?.family_record_verified ?? profile.family_record_verified ?? false,
-      residence_certificate_verified: checklist?.residence_certificate_verified ?? profile.residence_certificate_verified ?? false,
-      criminal_record_verified: checklist?.criminal_record_verified ?? profile.criminal_record_verified ?? false,
-      photos_verified: checklist?.photos_verified ?? profile.photos_verified ?? false,
-      diploma_verified: checklist?.diploma_verified ?? profile.diploma_verified ?? false,
-      admin_verification_notes: checklist?.notes ?? profile.admin_verification_notes ?? null,
-      admin_verification_date: status === 'verifie_en_main_propre' ? new Date().toISOString() : profile.admin_verification_date,
-    });
+      id_card_verified: checklist?.id_card_verified ?? false,
+      birth_certificate_verified: checklist?.birth_certificate_verified ?? false,
+      family_record_verified: checklist?.family_record_verified ?? false,
+      residence_certificate_verified: checklist?.residence_certificate_verified ?? false,
+      criminal_record_verified: checklist?.criminal_record_verified ?? false,
+      photos_verified: checklist?.photos_verified ?? false,
+      diploma_verified: checklist?.diploma_verified ?? false,
+      admin_verification_notes: checklist?.notes ?? null,
+      admin_verification_date: status === 'verifie_en_main_propre' ? new Date().toISOString() : null,
+    };
+
+    if (isSupabaseConfigured()) {
+      const supabase = createClient();
+      if (supabase) {
+        // Plain UPDATE only - NEVER upsert or insert to guarantee no RLS policy violations
+        const { data, error } = await supabase
+          .from('profiles')
+          .update(updatePayload)
+          .eq('id', providerId)
+          .select()
+          .single();
+
+        if (error) {
+          console.error('Supabase updateVerificationStatus error:', error.message);
+          throw error;
+        }
+
+        if (typeof window !== 'undefined') {
+          window.dispatchEvent(new CustomEvent('sm_data_change', { detail: { key: 'profiles' } }));
+        }
+        return true;
+      }
+    }
+
+    // MODE TEST LOCAL HORS LIGNE UNIQUEMENT
+    const profiles = getLocal<Profile[]>(STORAGE_KEYS.PROFILES, INITIAL_PROFILES);
+    const index = profiles.findIndex(p => p.id === providerId);
+    if (index >= 0) {
+      profiles[index] = { ...profiles[index], ...updatePayload };
+      setLocal(STORAGE_KEYS.PROFILES, profiles);
+    }
     return true;
   }
 

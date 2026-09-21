@@ -15,7 +15,7 @@ import Link from 'next/link';
 
 export default function AdminDashboardPage() {
   const { role, isConfigured, loading: authLoading } = useAuth();
-  const [activeTab, setActiveTab] = useState<'requests' | 'users' | 'listings'>('requests');
+  const [activeTab, setActiveTab] = useState<'requests' | 'candidates' | 'users' | 'listings'>('requests');
   
   // Requests state
   const [requests, setRequests] = useState<ServiceRequest[]>([]);
@@ -59,18 +59,36 @@ export default function AdminDashboardPage() {
   useEffect(() => {
     loadAllData();
 
-    // 1. Supabase Realtime Subscription if configured
+    // 1. Supabase Realtime Subscription (requests, profiles, service_listings)
     let channel: any = null;
     if (isSupabaseConfigured()) {
       const supabase = createClient();
       if (supabase) {
         channel = supabase
-          .channel('admin-requests')
+          .channel('admin-realtime')
           .on(
             'postgres_changes',
             { event: '*', schema: 'public', table: 'requests' },
             (payload) => {
-              setRealtimeNotice(`Nouvelle mise à jour en direct (${payload.eventType}) à ${new Date().toLocaleTimeString('fr-FR')}`);
+              setRealtimeNotice(`Demande de garde (${payload.eventType}) à ${new Date().toLocaleTimeString('fr-FR')}`);
+              loadAllData();
+              setTimeout(() => setRealtimeNotice(null), 5000);
+            }
+          )
+          .on(
+            'postgres_changes',
+            { event: '*', schema: 'public', table: 'profiles' },
+            (payload) => {
+              setRealtimeNotice(`Candidature / profil prestataire (${payload.eventType}) à ${new Date().toLocaleTimeString('fr-FR')}`);
+              loadAllData();
+              setTimeout(() => setRealtimeNotice(null), 5000);
+            }
+          )
+          .on(
+            'postgres_changes',
+            { event: '*', schema: 'public', table: 'service_listings' },
+            (payload) => {
+              setRealtimeNotice(`Annonce de service (${payload.eventType}) à ${new Date().toLocaleTimeString('fr-FR')}`);
               loadAllData();
               setTimeout(() => setRealtimeNotice(null), 5000);
             }
@@ -106,6 +124,10 @@ export default function AdminDashboardPage() {
     if (userRoleFilter === 'all') return true;
     return p.role === userRoleFilter;
   });
+
+  const pendingCandidates = profiles.filter(
+    p => p.role === 'provider' && p.verification_status === 'en_attente_physique'
+  );
 
   const newRequestsCount = requests.filter(r => r.status === 'new').length;
   const inProgressCount = requests.filter(r => r.status === 'in_progress').length;
@@ -210,14 +232,24 @@ export default function AdminDashboardPage() {
             <span className="text-[11px] text-on-surface-variant mt-1 block">Gardes en cours</span>
           </div>
 
-          <div className="bg-surface-container-lowest rounded-2xl border border-[#ded7ca] p-5 shadow-xs">
+          <div 
+            onClick={() => setActiveTab('candidates')}
+            className={`bg-surface-container-lowest rounded-2xl border p-5 shadow-xs cursor-pointer transition ${
+              pendingCandidates.length > 0 ? 'border-amber-400 bg-amber-50/40 hover:bg-amber-50/70' : 'border-[#ded7ca]'
+            }`}
+          >
             <span className="text-[11px] font-bold text-on-surface-variant uppercase tracking-wider block">
-              Missions Terminées
+              Candidatures en Attente
             </span>
-            <div className="font-serif text-3xl font-bold text-on-surface mt-1">
-              {completedCount}
+            <div className="font-serif text-3xl font-bold text-amber-800 mt-1 flex items-center justify-between">
+              <span>{pendingCandidates.length}</span>
+              {pendingCandidates.length > 0 ? (
+                <span className="material-symbols-outlined text-xl text-amber-600 animate-pulse">how_to_reg</span>
+              ) : (
+                <span className="material-symbols-outlined text-xl text-slate-400">check_circle</span>
+              )}
             </div>
-            <span className="text-[11px] text-on-surface-variant mt-1 block">Règlement espèces validé</span>
+            <span className="text-[11px] text-on-surface-variant mt-1 block">Vérification bureau requise</span>
           </div>
 
           <div className="bg-surface-container-lowest rounded-2xl border border-[#ded7ca] p-5 shadow-xs">
@@ -235,11 +267,11 @@ export default function AdminDashboardPage() {
         </div>
 
         {/* Navigation Onglets */}
-        <div className="flex items-center gap-2 border-b border-[#ded7ca] pb-3">
+        <div className="flex items-center gap-2 border-b border-[#ded7ca] pb-3 overflow-x-auto">
           <button
             type="button"
             onClick={() => setActiveTab('requests')}
-            className={`px-5 py-2.5 rounded-2xl text-xs font-bold transition flex items-center gap-2 ${
+            className={`px-5 py-2.5 rounded-2xl text-xs font-bold transition flex items-center gap-2 whitespace-nowrap ${
               activeTab === 'requests'
                 ? 'bg-primary text-white shadow-xs'
                 : 'bg-surface-container-lowest text-on-surface-variant hover:text-on-surface border border-[#ded7ca]'
@@ -251,8 +283,28 @@ export default function AdminDashboardPage() {
 
           <button
             type="button"
+            onClick={() => setActiveTab('candidates')}
+            className={`px-5 py-2.5 rounded-2xl text-xs font-bold transition flex items-center gap-2 whitespace-nowrap ${
+              activeTab === 'candidates'
+                ? 'bg-primary text-white shadow-xs'
+                : 'bg-surface-container-lowest text-on-surface-variant hover:text-on-surface border border-[#ded7ca]'
+            }`}
+          >
+            <span className="material-symbols-outlined text-base">how_to_reg</span>
+            <span>Candidatures Prestataires ({pendingCandidates.length})</span>
+            {pendingCandidates.length > 0 && (
+              <span className={`px-2 py-0.5 rounded-full text-[10px] font-extrabold ${
+                activeTab === 'candidates' ? 'bg-white text-primary' : 'bg-amber-200 text-amber-900'
+              }`}>
+                {pendingCandidates.length}
+              </span>
+            )}
+          </button>
+
+          <button
+            type="button"
             onClick={() => setActiveTab('users')}
-            className={`px-5 py-2.5 rounded-2xl text-xs font-bold transition flex items-center gap-2 ${
+            className={`px-5 py-2.5 rounded-2xl text-xs font-bold transition flex items-center gap-2 whitespace-nowrap ${
               activeTab === 'users'
                 ? 'bg-primary text-white shadow-xs'
                 : 'bg-surface-container-lowest text-on-surface-variant hover:text-on-surface border border-[#ded7ca]'
@@ -265,7 +317,7 @@ export default function AdminDashboardPage() {
           <button
             type="button"
             onClick={() => setActiveTab('listings')}
-            className={`px-5 py-2.5 rounded-2xl text-xs font-bold transition flex items-center gap-2 ${
+            className={`px-5 py-2.5 rounded-2xl text-xs font-bold transition flex items-center gap-2 whitespace-nowrap ${
               activeTab === 'listings'
                 ? 'bg-primary text-white shadow-xs'
                 : 'bg-surface-container-lowest text-on-surface-variant hover:text-on-surface border border-[#ded7ca]'
@@ -444,7 +496,134 @@ export default function AdminDashboardPage() {
           </div>
         )}
 
-        {/* TAB 2: UTILISATEURS */}
+        {/* TAB 2: CANDIDATURES PRESTATAIRES */}
+        {activeTab === 'candidates' && (
+          <div className="space-y-6">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 bg-surface-container-lowest p-6 rounded-3xl border border-[#ded7ca]">
+              <div>
+                <h3 className="font-serif font-bold text-xl text-on-surface">
+                  Candidatures Prestataires en Attente de Vérification
+                </h3>
+                <p className="text-xs sm:text-sm text-on-surface-variant mt-1">
+                  Profils inscrits en tant que prestataire avec statut « En attente physique ». Examinez leur dossier physique pour délivrer le Sceau Or ou rejeter leur candidature.
+                </p>
+              </div>
+              <Link
+                href="/admin/prestataires"
+                className="px-4 py-2.5 rounded-2xl bg-secondary text-white text-xs font-bold hover:bg-secondary-600 transition flex items-center gap-1.5 shrink-0 shadow-xs"
+              >
+                <span className="material-symbols-outlined text-base">fact_check</span>
+                <span>Ouvrir l'Espace Vérifications</span>
+              </Link>
+            </div>
+
+            {pendingCandidates.length === 0 ? (
+              <div className="bg-surface-container-lowest p-12 rounded-3xl border border-[#ded7ca] text-center space-y-3">
+                <span className="material-symbols-outlined text-4xl text-emerald-600">check_circle</span>
+                <h4 className="font-serif text-lg font-bold text-on-surface">Aucune candidature en attente</h4>
+                <p className="text-xs text-on-surface-variant max-w-sm mx-auto">
+                  Toutes les candidatures de prestataires ont été traitées (certifiées avec le Sceau Or ou rejetées).
+                </p>
+              </div>
+            ) : (
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                {pendingCandidates.map((candidate) => {
+                  const candidateListing = listings.find(l => l.provider_id === candidate.id);
+                  const candidateDossierCode = `CAND-ALG-${candidate.id.slice(-4).toUpperCase()}`;
+
+                  return (
+                    <div
+                      key={candidate.id}
+                      className="bg-surface-container-lowest rounded-3xl border border-[#ded7ca] p-6 shadow-sm space-y-4 hover:border-secondary/40 transition"
+                    >
+                      <div className="flex items-start justify-between gap-3 border-b border-[#ded7ca]/60 pb-3">
+                        <div className="space-y-1">
+                          <div className="flex items-center gap-2">
+                            <span className="font-serif font-bold text-base text-on-surface">
+                              {candidate.full_name}
+                            </span>
+                            <span className="text-[10px] px-2 py-0.5 rounded-full bg-amber-50 text-amber-800 border border-amber-300 font-bold">
+                              En attente physique
+                            </span>
+                          </div>
+                          <span className="text-[11px] text-outline font-mono">
+                            {candidateDossierCode} • Inscrit le {formatDate(candidate.created_at)}
+                          </span>
+                        </div>
+                      </div>
+
+                      {/* Coordonnées */}
+                      <div className="grid grid-cols-2 gap-3 text-xs">
+                        <div className="p-3 bg-[#FAF8F5] rounded-2xl border border-[#ded7ca]">
+                          <span className="text-[10px] uppercase font-bold text-on-surface-variant block">Téléphone</span>
+                          {candidate.phone ? (
+                            <div className="flex items-center gap-2 mt-1">
+                              <a
+                                href={`tel:${candidate.phone}`}
+                                className="font-bold text-primary hover:underline"
+                              >
+                                {candidate.phone}
+                              </a>
+                              <a
+                                href={`https://wa.me/213${candidate.phone.replace(/[^0-9]/g, '').replace(/^0/, '')}`}
+                                target="_blank"
+                                rel="noreferrer"
+                                className="text-emerald-600 hover:text-emerald-700"
+                                title="WhatsApp"
+                              >
+                                <span className="material-symbols-outlined text-[16px]">chat</span>
+                              </a>
+                            </div>
+                          ) : (
+                            <span className="text-on-surface-variant italic mt-1 block">Non renseigné</span>
+                          )}
+                        </div>
+
+                        <div className="p-3 bg-[#FAF8F5] rounded-2xl border border-[#ded7ca]">
+                          <span className="text-[10px] uppercase font-bold text-on-surface-variant block">Commune</span>
+                          <span className="font-bold text-on-surface mt-1 block">
+                            {candidate.location || 'Wilaya d\'Alger'}
+                          </span>
+                        </div>
+                      </div>
+
+                      {/* Annonce associée */}
+                      <div className="p-3 bg-[#FAF8F5] rounded-2xl border border-[#ded7ca] text-xs space-y-1">
+                        <span className="text-[10px] uppercase font-bold text-on-surface-variant block">Annonce rédigée</span>
+                        {candidateListing ? (
+                          <div>
+                            <strong className="text-on-surface font-semibold block">{candidateListing.title}</strong>
+                            <div className="flex items-center justify-between mt-1 text-[11px] text-on-surface-variant">
+                              <span>Tarif : <strong className="text-primary">{candidateListing.price} DA</strong> / {candidateListing.price_unit || 'séance'}</span>
+                              <span className="px-2 py-0.5 rounded-full bg-primary-fixed/40 text-primary font-bold capitalize">{candidateListing.category}</span>
+                            </div>
+                          </div>
+                        ) : (
+                          <p className="text-[11px] text-on-surface-variant italic">
+                            Aucune annonce rédigée pour le moment (compte prestataire uniquement).
+                          </p>
+                        )}
+                      </div>
+
+                      {/* Action : lien direct vers checklist */}
+                      <div className="pt-2 flex items-center justify-end gap-3">
+                        <Link
+                          href={`/admin/prestataires?id=${candidate.id}`}
+                          className="w-full sm:w-auto px-5 py-2.5 rounded-2xl bg-secondary hover:bg-secondary-600 text-white text-xs font-bold transition flex items-center justify-center gap-1.5 shadow-xs"
+                        >
+                          <span className="material-symbols-outlined text-sm">checklist</span>
+                          <span>Examiner le dossier physique →</span>
+                        </Link>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* TAB 3: UTILISATEURS */}
         {activeTab === 'users' && (
           <div className="bg-surface-container-lowest rounded-3xl border border-[#ded7ca] p-6 shadow-sm space-y-4">
             <div className="flex items-center justify-between pb-3 border-b border-[#ded7ca]">

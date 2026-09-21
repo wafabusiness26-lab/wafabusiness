@@ -370,3 +370,5 @@ create policy "Authenticated providers can update/delete their own photos"
 -- 6. REALTIME PUBLICATION POUR LE DISPATCHING ADMIN
 -- ------------------------------------------------------------------------------
 alter publication supabase_realtime add table public.requests;
+alter publication supabase_realtime add table public.profiles;
+alter publication supabase_realtime add table public.service_listings;

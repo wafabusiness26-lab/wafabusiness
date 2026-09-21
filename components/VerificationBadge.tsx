@@ -34,6 +34,15 @@ export const VerificationBadge: React.FC<VerificationBadgeProps> = ({ status = '
     );
   }
 
+  if (status === 'suspendu') {
+    return (
+      <span className={`inline-flex items-center font-bold rounded-full bg-rose-50 border border-rose-300 text-rose-800 ${sizeClasses[size]}`}>
+        <span className="material-symbols-outlined text-[13px] text-rose-600">cancel</span>
+        <span>Candidature Rejetée</span>
+      </span>
+    );
+  }
+
   return (
     <span className={`inline-flex items-center font-semibold rounded-full bg-slate-100 border border-slate-300 text-slate-600 ${sizeClasses[size]}`}>
       <span className="material-symbols-outlined text-[13px] text-slate-400">pending</span>

@@ -46,6 +46,18 @@ export default function AdminPrestatairesPage() {
     loadProviders();
   }, []);
 
+  // Sélection automatique si un ?id=<providerId> est présent dans l'URL
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      const params = new URLSearchParams(window.location.search);
+      const targetId = params.get('id');
+      if (targetId && providers.length > 0) {
+        const found = providers.find(p => p.id === targetId);
+        if (found) setSelectedProvider(found);
+      }
+    }
+  }, [providers]);
+
   useEffect(() => {
     if (selectedProvider) {
       setIdCardChecked(Boolean(selectedProvider.id_card_verified));
@@ -178,6 +190,7 @@ export default function AdminPrestatairesPage() {
               { key: 'all', label: 'Tous' },
               { key: 'en_attente_physique', label: 'En attente bureau' },
               { key: 'verifie_en_main_propre', label: 'Certifiés en main propre' },
+              { key: 'suspendu', label: 'Rejetés / Suspendus' },
             ].map(t => (
               <button
                 key={t.key}
@@ -483,6 +496,16 @@ export default function AdminPrestatairesPage() {
                     className="px-4 py-2.5 rounded-2xl bg-[#fcf8ee] border border-[#D4A373] text-[#7d562d] font-semibold text-xs hover:bg-[#ffdcbd] transition"
                   >
                     Remettre en attente
+                  </button>
+
+                  <button
+                    type="button"
+                    disabled={updating}
+                    onClick={() => handleCertify('suspendu')}
+                    className="px-4 py-2.5 rounded-2xl bg-rose-50 border border-rose-300 text-rose-800 font-bold text-xs hover:bg-rose-100 disabled:opacity-50 transition flex items-center gap-1.5"
+                  >
+                    <span className="material-symbols-outlined text-sm">cancel</span>
+                    <span>Rejeter la candidature</span>
                   </button>
                 </div>
 
