@@ -114,8 +114,13 @@ export default function AdminPrestatairesPage() {
   };
 
   const filteredProviders = providers.filter((p) => {
-    if (filterStatus !== 'all' && (p.verification_status || 'en_attente_physique') !== filterStatus) {
-      return false;
+    if (filterStatus !== 'all') {
+      const isPending = !p.verification_status || p.verification_status === 'en_attente_physique' || p.verification_status === 'non_verifie';
+      if (filterStatus === 'en_attente_physique') {
+        if (!isPending) return false;
+      } else if (p.verification_status !== filterStatus) {
+        return false;
+      }
     }
     if (searchQuery) {
       const q = searchQuery.toLowerCase();

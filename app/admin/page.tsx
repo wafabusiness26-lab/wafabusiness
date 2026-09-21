@@ -126,7 +126,7 @@ export default function AdminDashboardPage() {
   });
 
   const pendingCandidates = profiles.filter(
-    p => p.role === 'provider' && p.verification_status === 'en_attente_physique'
+    p => p.role === 'provider' && p.verification_status !== 'verifie_en_main_propre' && p.verification_status !== 'suspendu'
   );
 
   const newRequestsCount = requests.filter(r => r.status === 'new').length;
