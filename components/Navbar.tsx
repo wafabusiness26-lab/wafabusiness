@@ -6,6 +6,9 @@ import { usePathname } from 'next/navigation';
 import { useAuth } from '@/lib/auth-context';
 import { Logo } from './Logo';
 import { ADMIN_CONTACT } from '@/lib/constants';
+import { DataStore } from '@/lib/store';
+import { createClient, isSupabaseConfigured } from '@/lib/supabase/client';
+import { VerificationBadge } from './VerificationBadge';
 
 // Les 5 pages phares de la plateforme (identiques à la barre de navigation desktop)
 const CORE_5_PAGES = [
@@ -60,31 +63,102 @@ export const Navbar: React.FC = () => {
   const pathname = usePathname();
   const { role, profile, logout } = useAuth();
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+  const [notifOpen, setNotifOpen] = useState(false);
+  const [pendingProviders, setPendingProviders] = useState<any[]>([]);
+  const notifRef = React.useRef<HTMLDivElement>(null);
 
   const isActive = (path: string) => {
     if (path === '/') return pathname === '/';
     return pathname === path || (path !== '/' && pathname.startsWith(path));
   };
 
-  // Fermer le menu lors de la navigation
+  // Fermer le menu et notifications lors de la navigation
   useEffect(() => {
     setMobileMenuOpen(false);
+    setNotifOpen(false);
   }, [pathname]);
 
-  // Écouter la touche Échap pour fermer le menu
+  // Charger les notifications des prestataires en attente pour l'administrateur
+  useEffect(() => {
+    if (role !== 'admin') return;
+
+    const loadNotifications = async () => {
+      try {
+        const [providers, listings] = await Promise.all([
+          DataStore.getProfiles('provider'),
+          DataStore.getListings({ includeUnverified: true }),
+        ]);
+        const pending = providers
+          .filter(p => p.verification_status !== 'verifie_en_main_propre' && p.verification_status !== 'suspendu')
+          .map(p => ({
+            ...p,
+            listing: listings.find(l => l.provider_id === p.id),
+          }));
+        setPendingProviders(pending);
+      } catch (e) {
+        console.error('Erreur chargement notifications admin:', e);
+      }
+    };
+
+    loadNotifications();
+
+    const handleDataChange = () => {
+      loadNotifications();
+    };
+    window.addEventListener('sm_data_change', handleDataChange);
+
+    let channel: any = null;
+    if (isSupabaseConfigured()) {
+      const supabase = createClient();
+      if (supabase) {
+        channel = supabase
+          .channel('navbar-admin-notifs')
+          .on('postgres_changes', { event: '*', schema: 'public', table: 'profiles' }, () => {
+            loadNotifications();
+          })
+          .on('postgres_changes', { event: '*', schema: 'public', table: 'service_listings' }, () => {
+            loadNotifications();
+          })
+          .subscribe();
+      }
+    }
+
+    return () => {
+      window.removeEventListener('sm_data_change', handleDataChange);
+      if (channel) channel.unsubscribe();
+    };
+  }, [role]);
+
+  // Fermer le popover de notifications au clic extérieur
+  useEffect(() => {
+    const handleClickOutside = (e: MouseEvent) => {
+      if (notifRef.current && !notifRef.current.contains(e.target as Node)) {
+        setNotifOpen(false);
+      }
+    };
+    if (notifOpen) {
+      document.addEventListener('mousedown', handleClickOutside);
+    }
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutside);
+    };
+  }, [notifOpen]);
+
+  // Écouter la touche Échap pour fermer le menu ou les notifs
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
       if (e.key === 'Escape') {
         setMobileMenuOpen(false);
+        setNotifOpen(false);
       }
     };
-    if (mobileMenuOpen) {
+    if (mobileMenuOpen || notifOpen) {
       window.addEventListener('keydown', handleKeyDown);
     }
     return () => {
       window.removeEventListener('keydown', handleKeyDown);
     };
-  }, [mobileMenuOpen]);
+  }, [mobileMenuOpen, notifOpen]);
 
   return (
     <>
@@ -233,6 +307,103 @@ export const Navbar: React.FC = () => {
                 </span>
               </div>
             </a>
+
+            {/* Admin Notification Bell with Popover Dropdown */}
+            {role === 'admin' && (
+              <div className="relative" ref={notifRef}>
+                <button
+                  type="button"
+                  onClick={() => setNotifOpen(!notifOpen)}
+                  aria-label="Notifications candidatures prestataires"
+                  title="Nouvelles candidatures & annonces"
+                  className={`relative p-2 rounded-full transition-all duration-150 flex items-center justify-center cursor-pointer ${
+                    notifOpen
+                      ? 'bg-primary text-white shadow-xs'
+                      : 'bg-surface-container-low hover:bg-surface-container text-on-surface border border-[#ded7ca]'
+                  }`}
+                >
+                  <span className="material-symbols-outlined text-[20px] sm:text-[22px]">
+                    notifications
+                  </span>
+                  {pendingProviders.length > 0 && (
+                    <span className="absolute -top-1 -right-1 flex h-4 w-4 items-center justify-center rounded-full bg-red-600 text-[10px] font-bold text-white ring-2 ring-white animate-pulse">
+                      {pendingProviders.length}
+                    </span>
+                  )}
+                </button>
+
+                {/* Dropdown Popover */}
+                {notifOpen && (
+                  <div className="absolute right-0 mt-2 w-80 sm:w-96 bg-[#FAF8F5] rounded-3xl border border-[#ded7ca] shadow-2xl z-50 overflow-hidden">
+                    {/* Header */}
+                    <div className="p-4 bg-[#17222d] text-white flex items-center justify-between">
+                      <div className="flex items-center gap-2">
+                        <span className="material-symbols-outlined text-amber-400 text-lg">notifications_active</span>
+                        <h4 className="font-serif font-bold text-sm">Candidatures Prestataires</h4>
+                      </div>
+                      <span className="px-2 py-0.5 rounded-full text-[10px] font-extrabold bg-amber-400/20 text-amber-200 border border-amber-400/30">
+                        {pendingProviders.length} en attente
+                      </span>
+                    </div>
+
+                    {/* Notification List */}
+                    <div className="max-h-80 overflow-y-auto divide-y divide-[#ded7ca]/60">
+                      {pendingProviders.length === 0 ? (
+                        <div className="p-6 text-center text-xs text-on-surface-variant space-y-1">
+                          <span className="material-symbols-outlined text-3xl text-emerald-600 block mb-1">check_circle</span>
+                          <p className="font-semibold text-on-surface">Aucune candidature en attente</p>
+                          <p className="text-[11px]">Toutes les candidatures ont été traitées.</p>
+                        </div>
+                      ) : (
+                        pendingProviders.map((prov) => (
+                          <Link
+                            key={prov.id}
+                            href={`/admin?id=${prov.id}`}
+                            onClick={() => setNotifOpen(false)}
+                            className="block p-3.5 hover:bg-white/80 transition group"
+                          >
+                            <div className="flex items-start justify-between gap-2">
+                              <div className="flex items-center gap-2">
+                                <div className="w-8 h-8 rounded-full bg-primary-container text-white font-bold text-xs flex items-center justify-center shrink-0">
+                                  {prov.full_name?.charAt(0) || 'P'}
+                                </div>
+                                <div className="min-w-0">
+                                  <span className="font-bold text-xs text-on-surface group-hover:text-primary transition block truncate">
+                                    {prov.full_name}
+                                  </span>
+                                  <span className="text-[10px] text-on-surface-variant block truncate">
+                                    {prov.location || 'Wilaya d\'Alger'} • {prov.phone || 'Tél non renseigné'}
+                                  </span>
+                                </div>
+                              </div>
+                              <VerificationBadge status={prov.verification_status || 'en_attente_physique'} size="sm" />
+                            </div>
+
+                            {prov.listing && (
+                              <div className="mt-2 pl-10 text-[11px] text-on-surface-variant">
+                                <span className="font-semibold text-secondary">Annonce :</span> {prov.listing.title} ({prov.listing.price} DA)
+                              </div>
+                            )}
+                          </Link>
+                        ))
+                      )}
+                    </div>
+
+                    {/* Footer Button */}
+                    <div className="p-3 bg-[#f3efe6] border-t border-[#ded7ca] text-center">
+                      <Link
+                        href="/admin"
+                        onClick={() => setNotifOpen(false)}
+                        className="w-full inline-flex items-center justify-center gap-1.5 text-xs font-bold text-primary hover:text-primary-600 py-1"
+                      >
+                        <span>Ouvrir le Panneau de Contrôle</span>
+                        <span className="material-symbols-outlined text-sm">arrow_forward</span>
+                      </Link>
+                    </div>
+                  </div>
+                )}
+              </div>
+            )}
 
             {/* User Account / Profile */}
             {profile ? (

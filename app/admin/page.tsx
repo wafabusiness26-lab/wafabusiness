@@ -2,26 +2,28 @@
 
 import React, { useState, useEffect } from 'react';
 import { 
-  ServiceRequest, 
-  RequestStatus, 
   Profile, 
-  ServiceListing 
+  ServiceListing, 
+  VerificationStatus,
+  UserRole
 } from '@/types';
 import { DataStore } from '@/lib/store';
 import { createClient, isSupabaseConfigured } from '@/lib/supabase/client';
-import { getStatusBadgeStyle, formatDate, formatPrice, getCategoryBadge } from '@/lib/utils';
+import { formatDate, formatPrice, getCategoryBadge } from '@/lib/utils';
 import { useAuth } from '@/lib/auth-context';
+import { VerificationBadge } from '@/components/VerificationBadge';
 import Link from 'next/link';
 
 export default function AdminDashboardPage() {
   const { role, isConfigured, loading: authLoading } = useAuth();
-  const [activeTab, setActiveTab] = useState<'requests' | 'candidates' | 'users' | 'listings'>('requests');
+  const [activeTab, setActiveTab] = useState<'candidates' | 'listings' | 'users'>('candidates');
   
-  // Requests state
-  const [requests, setRequests] = useState<ServiceRequest[]>([]);
-  const [selectedRequest, setSelectedRequest] = useState<ServiceRequest | null>(null);
-  const [requestStatusFilter, setRequestStatusFilter] = useState<string>('all');
-  
+  // Candidates filter and search state
+  const [candidateStatusFilter, setCandidateStatusFilter] = useState<string>('all');
+  const [candidateSearch, setCandidateSearch] = useState<string>('');
+  const [highlightId, setHighlightId] = useState<string | null>(null);
+  const [updatingCandidateId, setUpdatingCandidateId] = useState<string | null>(null);
+
   // Users state
   const [profiles, setProfiles] = useState<Profile[]>([]);
   const [userRoleFilter, setUserRoleFilter] = useState<string>('all');
@@ -36,19 +38,12 @@ export default function AdminDashboardPage() {
   const loadAllData = async () => {
     setLoading(true);
     try {
-      const [allRequests, allProfiles, allListings] = await Promise.all([
-        DataStore.getRequests(),
+      const [allProfiles, allListings] = await Promise.all([
         DataStore.getProfiles(),
         DataStore.getListings({ includeUnverified: true }),
       ]);
-      setRequests(allRequests);
       setProfiles(allProfiles);
       setListings(allListings);
-
-      if (selectedRequest) {
-        const refreshed = allRequests.find(r => r.id === selectedRequest.id);
-        if (refreshed) setSelectedRequest(refreshed);
-      }
     } catch (err) {
       console.error(err);
     } finally {
@@ -59,22 +54,27 @@ export default function AdminDashboardPage() {
   useEffect(() => {
     loadAllData();
 
-    // 1. Supabase Realtime Subscription (requests, profiles, service_listings)
+    // Check URL parameters for candidate highlighting or tab selection
+    if (typeof window !== 'undefined') {
+      const params = new URLSearchParams(window.location.search);
+      const targetId = params.get('id');
+      if (targetId) {
+        setHighlightId(targetId);
+        setActiveTab('candidates');
+      }
+      const targetTab = params.get('tab');
+      if (targetTab === 'candidates' || targetTab === 'listings' || targetTab === 'users') {
+        setActiveTab(targetTab);
+      }
+    }
+
+    // 1. Supabase Realtime Subscription (profiles, service_listings)
     let channel: any = null;
     if (isSupabaseConfigured()) {
       const supabase = createClient();
       if (supabase) {
         channel = supabase
           .channel('admin-realtime')
-          .on(
-            'postgres_changes',
-            { event: '*', schema: 'public', table: 'requests' },
-            (payload) => {
-              setRealtimeNotice(`Demande de garde (${payload.eventType}) à ${new Date().toLocaleTimeString('fr-FR')}`);
-              loadAllData();
-              setTimeout(() => setRealtimeNotice(null), 5000);
-            }
-          )
           .on(
             'postgres_changes',
             { event: '*', schema: 'public', table: 'profiles' },
@@ -110,9 +110,16 @@ export default function AdminDashboardPage() {
     };
   }, []);
 
-  const handleStatusChange = async (requestId: string, newStatus: RequestStatus) => {
-    await DataStore.updateRequestStatus(requestId, newStatus);
-    await loadAllData();
+  const handleUpdateCandidateStatus = async (providerId: string, newStatus: VerificationStatus) => {
+    setUpdatingCandidateId(providerId);
+    try {
+      await DataStore.updateVerificationStatus(providerId, newStatus);
+      await loadAllData();
+    } catch (e: any) {
+      alert("Erreur lors de la mise à jour du statut : " + (e.message || e));
+    } finally {
+      setUpdatingCandidateId(null);
+    }
   };
 
   const handlePromoteToProvider = async (userId: string) => {
@@ -139,23 +146,51 @@ export default function AdminDashboardPage() {
     }
   };
 
-  const filteredRequests = requests.filter((r) => {
-    if (requestStatusFilter === 'all') return true;
-    return r.status === requestStatusFilter;
+  // Provider Candidatures Breakdown
+  const allProviderProfiles = profiles.filter(p => p.role === 'provider');
+  const pendingCandidates = allProviderProfiles.filter(
+    p => p.verification_status === 'en_attente_physique' || (!p.verification_status && p.role === 'provider')
+  );
+  const unreviewedCandidates = allProviderProfiles.filter(
+    p => p.verification_status === 'non_verifie'
+  );
+  const verifiedCandidates = allProviderProfiles.filter(
+    p => p.verification_status === 'verifie_en_main_propre'
+  );
+  const suspendedCandidates = allProviderProfiles.filter(
+    p => p.verification_status === 'suspendu'
+  );
+
+  // Filtered Candidates according to status tab and search query
+  const filteredCandidates = allProviderProfiles.filter((p) => {
+    if (candidateStatusFilter === 'en_attente_physique') {
+      const isPending = p.verification_status === 'en_attente_physique' || !p.verification_status;
+      if (!isPending) return false;
+    } else if (candidateStatusFilter === 'non_verifie') {
+      if (p.verification_status !== 'non_verifie') return false;
+    } else if (candidateStatusFilter === 'verifie_en_main_propre') {
+      if (p.verification_status !== 'verifie_en_main_propre') return false;
+    } else if (candidateStatusFilter === 'suspendu') {
+      if (p.verification_status !== 'suspendu') return false;
+    }
+
+    if (candidateSearch.trim()) {
+      const q = candidateSearch.toLowerCase().trim();
+      const code = `CAND-ALG-${p.id.slice(-4)}`.toLowerCase();
+      const matchName = p.full_name?.toLowerCase().includes(q);
+      const matchPhone = p.phone && p.phone.includes(q);
+      const matchLoc = p.location && p.location.toLowerCase().includes(q);
+      const matchCode = code.includes(q);
+      if (!matchName && !matchPhone && !matchLoc && !matchCode) return false;
+    }
+
+    return true;
   });
 
   const filteredProfiles = profiles.filter((p) => {
     if (userRoleFilter === 'all') return true;
     return p.role === userRoleFilter;
   });
-
-  const pendingCandidates = profiles.filter(
-    p => p.role === 'provider' && p.verification_status !== 'verifie_en_main_propre' && p.verification_status !== 'suspendu'
-  );
-
-  const newRequestsCount = requests.filter(r => r.status === 'new').length;
-  const inProgressCount = requests.filter(r => r.status === 'in_progress').length;
-  const completedCount = requests.filter(r => r.status === 'completed').length;
 
   if (!authLoading && isConfigured && role !== 'admin') {
     return (
@@ -165,7 +200,7 @@ export default function AdminDashboardPage() {
         </div>
         <h2 className="font-serif text-2xl font-bold text-on-surface">Accès Administrateur Restreint</h2>
         <p className="text-xs sm:text-sm text-on-surface-variant max-w-md mx-auto leading-relaxed">
-          Cet espace confidentiel contient les numéros de téléphone privés des familles et des prestataires. Vous devez être connecté avec un compte disposant du rôle <strong>admin</strong>.
+          Cet espace confidentiel contient les dossiers et numéros de téléphone des candidats et prestataires. Vous devez être connecté avec un compte disposant du rôle <strong>admin</strong>.
         </p>
         <div>
           <Link
@@ -193,30 +228,30 @@ export default function AdminDashboardPage() {
               </span>
               <span className="flex items-center gap-1.5 text-[11px] text-[#c6ebd7] font-semibold">
                 <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
-                <span>Ligne Directe Active</span>
+                <span>Supervision en Direct</span>
               </span>
             </div>
 
             <h1 className="font-serif text-2xl sm:text-4xl font-bold tracking-tight">
-              Tableau de Bord &amp; Dispatching Téléphonique
+              Tableau de Bord &amp; Candidatures Prestataires
             </h1>
             <p className="text-xs sm:text-sm text-[#ded7ca] max-w-2xl leading-relaxed">
-              Consultez les demandes des familles en direct, contactez par téléphone les prestataires, contrôlez les pièces d'identité en main propre et mettez à jour les statuts.
+              Supervisez toutes les candidatures prestataires, examinez les statuts en direct, validez le Sceau Or après contrôle physique ou suspendez les comptes non conformes.
             </p>
           </div>
 
           <div className="flex items-center gap-2 shrink-0">
             <Link
               href="/admin/prestataires"
-              className="px-4 py-2.5 bg-secondary hover:bg-secondary-600 text-white rounded-2xl text-xs font-bold transition flex items-center gap-1.5"
+              className="px-4 py-2.5 bg-secondary hover:bg-secondary-600 text-white rounded-2xl text-xs font-bold transition flex items-center gap-1.5 shadow-sm"
             >
-              <span className="material-symbols-outlined text-base">how_to_reg</span>
-              <span>Vérifications Physiques</span>
+              <span className="material-symbols-outlined text-base">checklist</span>
+              <span>Espace 7 Pièces Physiques</span>
             </Link>
             <button
               onClick={loadAllData}
-              className="p-2.5 bg-[#233241] hover:bg-[#2d3e50] text-white rounded-2xl text-xs transition"
-              title="Actualiser"
+              className="p-2.5 bg-[#233241] hover:bg-[#2d3e50] text-white rounded-2xl text-xs transition cursor-pointer"
+              title="Actualiser les données"
             >
               <span className="material-symbols-outlined text-lg">refresh</span>
             </button>
@@ -225,7 +260,7 @@ export default function AdminDashboardPage() {
 
         {/* Realtime Alert Banner */}
         {realtimeNotice && (
-          <div className="p-4 rounded-2xl bg-secondary text-white text-xs font-semibold flex items-center justify-between shadow-md">
+          <div className="p-4 rounded-2xl bg-secondary text-white text-xs font-semibold flex items-center justify-between shadow-md animate-fadeIn">
             <div className="flex items-center gap-2">
               <span className="material-symbols-outlined text-base animate-pulse">notifications_active</span>
               <span>{realtimeNotice}</span>
@@ -235,58 +270,75 @@ export default function AdminDashboardPage() {
 
         {/* Métriques Clés Bento */}
         <div className="grid grid-cols-1 sm:grid-cols-4 gap-4">
-          <div className="bg-surface-container-lowest rounded-2xl border border-[#ded7ca] p-5 shadow-xs">
-            <span className="text-[11px] font-bold text-on-surface-variant uppercase tracking-wider block">
-              À Appeler d'Urgence
-            </span>
-            <div className="font-serif text-3xl font-bold text-primary mt-1 flex items-center justify-between">
-              <span>{newRequestsCount}</span>
-              <span className="material-symbols-outlined text-xl text-primary animate-pulse">phone_in_talk</span>
-            </div>
-            <span className="text-[11px] text-on-surface-variant mt-1 block">Demandes &lt; 2h</span>
-          </div>
-
-          <div className="bg-surface-container-lowest rounded-2xl border border-[#ded7ca] p-5 shadow-xs">
-            <span className="text-[11px] font-bold text-on-surface-variant uppercase tracking-wider block">
-              Missions Confirmées
-            </span>
-            <div className="font-serif text-3xl font-bold text-secondary mt-1">
-              {inProgressCount}
-            </div>
-            <span className="text-[11px] text-on-surface-variant mt-1 block">Gardes en cours</span>
-          </div>
-
           <div 
-            onClick={() => setActiveTab('candidates')}
+            onClick={() => {
+              setActiveTab('candidates');
+              setCandidateStatusFilter('en_attente_physique');
+            }}
             className={`bg-surface-container-lowest rounded-2xl border p-5 shadow-xs cursor-pointer transition ${
-              pendingCandidates.length > 0 ? 'border-amber-400 bg-amber-50/40 hover:bg-amber-50/70' : 'border-[#ded7ca]'
+              pendingCandidates.length > 0 ? 'border-amber-400 bg-amber-50/40 hover:bg-amber-50/70' : 'border-[#ded7ca] hover:border-primary/40'
             }`}
           >
             <span className="text-[11px] font-bold text-on-surface-variant uppercase tracking-wider block">
-              Candidatures en Attente
+              En Attente Bureau
             </span>
             <div className="font-serif text-3xl font-bold text-amber-800 mt-1 flex items-center justify-between">
               <span>{pendingCandidates.length}</span>
               {pendingCandidates.length > 0 ? (
-                <span className="material-symbols-outlined text-xl text-amber-600 animate-pulse">how_to_reg</span>
+                <span className="material-symbols-outlined text-xl text-amber-600 animate-pulse">schedule</span>
               ) : (
                 <span className="material-symbols-outlined text-xl text-slate-400">check_circle</span>
               )}
             </div>
-            <span className="text-[11px] text-on-surface-variant mt-1 block">Vérification bureau requise</span>
+            <span className="text-[11px] text-on-surface-variant mt-1 block">Convocation physique requise</span>
           </div>
 
-          <div className="bg-surface-container-lowest rounded-2xl border border-[#ded7ca] p-5 shadow-xs">
+          <div 
+            onClick={() => {
+              setActiveTab('candidates');
+              setCandidateStatusFilter('non_verifie');
+            }}
+            className="bg-surface-container-lowest rounded-2xl border border-[#ded7ca] p-5 shadow-xs cursor-pointer hover:border-primary/40 transition"
+          >
             <span className="text-[11px] font-bold text-on-surface-variant uppercase tracking-wider block">
-              Total Prestataires
+              Non Examinés
             </span>
-            <div className="font-serif text-3xl font-bold text-wax-gold mt-1 flex items-center justify-between">
-              <span>{profiles.filter(p => p.role === 'provider').length}</span>
-              <Link href="/admin/prestataires" className="text-xs font-bold text-primary hover:underline">
-                Vérifier →
-              </Link>
+            <div className="font-serif text-3xl font-bold text-slate-700 mt-1 flex items-center justify-between">
+              <span>{unreviewedCandidates.length}</span>
+              <span className="material-symbols-outlined text-xl text-slate-400">pending</span>
             </div>
-            <span className="text-[11px] text-on-surface-variant mt-1 block">Dossiers Wilaya d'Alger</span>
+            <span className="text-[11px] text-on-surface-variant mt-1 block">Nouveaux dossiers inscrits</span>
+          </div>
+
+          <div 
+            onClick={() => {
+              setActiveTab('candidates');
+              setCandidateStatusFilter('verifie_en_main_propre');
+            }}
+            className="bg-surface-container-lowest rounded-2xl border border-[#ded7ca] p-5 shadow-xs cursor-pointer hover:border-secondary/40 transition"
+          >
+            <span className="text-[11px] font-bold text-on-surface-variant uppercase tracking-wider block">
+              Certifiés Sceau Or
+            </span>
+            <div className="font-serif text-3xl font-bold text-secondary mt-1 flex items-center justify-between">
+              <span>{verifiedCandidates.length}</span>
+              <span className="material-symbols-outlined text-xl text-secondary material-symbols-fill">verified</span>
+            </div>
+            <span className="text-[11px] text-on-surface-variant mt-1 block">Visibles au catalogue public</span>
+          </div>
+
+          <div 
+            onClick={() => setActiveTab('listings')}
+            className="bg-surface-container-lowest rounded-2xl border border-[#ded7ca] p-5 shadow-xs cursor-pointer hover:border-primary/40 transition"
+          >
+            <span className="text-[11px] font-bold text-on-surface-variant uppercase tracking-wider block">
+              Annonces Catalogue
+            </span>
+            <div className="font-serif text-3xl font-bold text-primary mt-1 flex items-center justify-between">
+              <span>{listings.length}</span>
+              <span className="material-symbols-outlined text-xl text-primary">assignment</span>
+            </div>
+            <span className="text-[11px] text-on-surface-variant mt-1 block">Services créés par les prestataires</span>
           </div>
         </div>
 
@@ -294,54 +346,28 @@ export default function AdminDashboardPage() {
         <div className="flex items-center gap-2 border-b border-[#ded7ca] pb-3 overflow-x-auto">
           <button
             type="button"
-            onClick={() => setActiveTab('requests')}
-            className={`px-5 py-2.5 rounded-2xl text-xs font-bold transition flex items-center gap-2 whitespace-nowrap ${
-              activeTab === 'requests'
-                ? 'bg-primary text-white shadow-xs'
-                : 'bg-surface-container-lowest text-on-surface-variant hover:text-on-surface border border-[#ded7ca]'
-            }`}
-          >
-            <span className="material-symbols-outlined text-base">support_agent</span>
-            <span>Dispatching Téléphonique ({requests.length})</span>
-          </button>
-
-          <button
-            type="button"
             onClick={() => setActiveTab('candidates')}
-            className={`px-5 py-2.5 rounded-2xl text-xs font-bold transition flex items-center gap-2 whitespace-nowrap ${
+            className={`px-5 py-2.5 rounded-2xl text-xs font-bold transition flex items-center gap-2 whitespace-nowrap cursor-pointer ${
               activeTab === 'candidates'
                 ? 'bg-primary text-white shadow-xs'
                 : 'bg-surface-container-lowest text-on-surface-variant hover:text-on-surface border border-[#ded7ca]'
             }`}
           >
             <span className="material-symbols-outlined text-base">how_to_reg</span>
-            <span>Candidatures Prestataires ({pendingCandidates.length})</span>
+            <span>Candidatures Prestataires ({allProviderProfiles.length})</span>
             {pendingCandidates.length > 0 && (
               <span className={`px-2 py-0.5 rounded-full text-[10px] font-extrabold ${
                 activeTab === 'candidates' ? 'bg-white text-primary' : 'bg-amber-200 text-amber-900'
               }`}>
-                {pendingCandidates.length}
+                {pendingCandidates.length} en attente
               </span>
             )}
           </button>
 
           <button
             type="button"
-            onClick={() => setActiveTab('users')}
-            className={`px-5 py-2.5 rounded-2xl text-xs font-bold transition flex items-center gap-2 whitespace-nowrap ${
-              activeTab === 'users'
-                ? 'bg-primary text-white shadow-xs'
-                : 'bg-surface-container-lowest text-on-surface-variant hover:text-on-surface border border-[#ded7ca]'
-            }`}
-          >
-            <span className="material-symbols-outlined text-base">group</span>
-            <span>Utilisateurs ({profiles.length})</span>
-          </button>
-
-          <button
-            type="button"
             onClick={() => setActiveTab('listings')}
-            className={`px-5 py-2.5 rounded-2xl text-xs font-bold transition flex items-center gap-2 whitespace-nowrap ${
+            className={`px-5 py-2.5 rounded-2xl text-xs font-bold transition flex items-center gap-2 whitespace-nowrap cursor-pointer ${
               activeTab === 'listings'
                 ? 'bg-primary text-white shadow-xs'
                 : 'bg-surface-container-lowest text-on-surface-variant hover:text-on-surface border border-[#ded7ca]'
@@ -350,186 +376,32 @@ export default function AdminDashboardPage() {
             <span className="material-symbols-outlined text-base">assignment</span>
             <span>Annonces ({listings.length})</span>
           </button>
+
+          <button
+            type="button"
+            onClick={() => setActiveTab('users')}
+            className={`px-5 py-2.5 rounded-2xl text-xs font-bold transition flex items-center gap-2 whitespace-nowrap cursor-pointer ${
+              activeTab === 'users'
+                ? 'bg-primary text-white shadow-xs'
+                : 'bg-surface-container-lowest text-on-surface-variant hover:text-on-surface border border-[#ded7ca]'
+            }`}
+          >
+            <span className="material-symbols-outlined text-base">group</span>
+            <span>Utilisateurs ({profiles.length})</span>
+          </button>
         </div>
 
-        {/* TAB 1: DISPATCHING DEMANDES */}
-        {activeTab === 'requests' && (
-          <div className="space-y-6">
-            {/* Filtres de statut */}
-            <div className="flex items-center gap-2 overflow-x-auto pb-1">
-              {[
-                { key: 'all', label: `Toutes (${requests.length})` },
-                { key: 'new', label: `Nouvelles / À appeler (${newRequestsCount})` },
-                { key: 'in_progress', label: `En cours (${inProgressCount})` },
-                { key: 'completed', label: `Terminées (${completedCount})` },
-                { key: 'cancelled', label: 'Annulées' }
-              ].map(t => (
-                <button
-                  key={t.key}
-                  onClick={() => setRequestStatusFilter(t.key)}
-                  className={`px-3.5 py-1.5 rounded-xl text-xs font-bold border transition whitespace-nowrap ${
-                    requestStatusFilter === t.key
-                      ? 'bg-secondary text-white border-secondary'
-                      : 'bg-surface-container-lowest border-[#ded7ca] text-on-surface-variant'
-                  }`}
-                >
-                  {t.label}
-                </button>
-              ))}
-            </div>
-
-            {loading ? (
-              <div className="py-20 text-center space-y-2">
-                <span className="material-symbols-outlined text-3xl text-primary animate-spin">
-                  progress_activity
-                </span>
-                <p className="text-xs text-on-surface-variant">Chargement des dossiers...</p>
-              </div>
-            ) : filteredRequests.length === 0 ? (
-              <div className="bg-surface-container-lowest p-12 rounded-3xl border border-[#ded7ca] text-center space-y-3">
-                <span className="material-symbols-outlined text-3xl text-on-surface-variant">inbox</span>
-                <p className="text-xs text-on-surface-variant">Aucune demande trouvée pour ce statut.</p>
-              </div>
-            ) : (
-              <div className="space-y-4">
-                {filteredRequests.map((req) => {
-                  const badge = getStatusBadgeStyle(req.status);
-                  const client = req.client;
-                  const provider = req.listing?.provider;
-                  const dossierCode = `TW-ALG-${req.id.slice(-4).toUpperCase()}`;
-
-                  return (
-                    <div
-                      key={req.id}
-                      className="bg-surface-container-lowest rounded-3xl border border-[#ded7ca] p-6 shadow-sm space-y-4"
-                    >
-                      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-[#ded7ca]/60 pb-3">
-                        <div className="flex items-center gap-2.5">
-                          <span className="font-serif font-bold text-base text-on-surface">
-                            {dossierCode}
-                          </span>
-                          <span className={`text-[11px] font-bold px-2.5 py-0.5 rounded-full border ${badge.bg}`}>
-                            {badge.label}
-                          </span>
-                          <span className="text-xs text-on-surface-variant">
-                            {formatDate(req.created_at)}
-                          </span>
-                        </div>
-
-                        {/* Status update select */}
-                        <div className="flex items-center gap-2">
-                          <span className="text-xs text-on-surface-variant font-medium">Statut mission :</span>
-                          <select
-                            value={req.status}
-                            onChange={(e) => handleStatusChange(req.id, e.target.value as RequestStatus)}
-                            className="bg-[#FAF8F5] border border-[#ded7ca] rounded-xl px-2.5 py-1 text-xs text-on-surface font-semibold focus:outline-none"
-                          >
-                            <option value="new">Nouvelle (À appeler)</option>
-                            <option value="in_progress">Confirmée &amp; En cours</option>
-                            <option value="completed">Terminée (Paiement reçu)</option>
-                            <option value="cancelled">Annulée</option>
-                          </select>
-                        </div>
-                      </div>
-
-                      {/* Main Dual Call Row: Client Phone vs Provider Phone */}
-                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                        {/* Client Call Box */}
-                        <div className="p-4 rounded-2xl bg-[#FAF8F5] border border-[#ded7ca] space-y-2">
-                          <span className="text-[10px] font-bold uppercase tracking-wider text-primary block">
-                            Famille d'Alger (Demandeur)
-                          </span>
-                          <div className="flex items-center justify-between">
-                            <div>
-                              <strong className="font-serif text-sm text-on-surface block">
-                                {req.client_name || client?.full_name || 'Client Famille'}
-                              </strong>
-                              <span className="text-xs text-on-surface-variant">
-                                {req.client_phone || client?.phone || 'Téléphone non précisé'}
-                              </span>
-                            </div>
-                            {(req.client_phone || client?.phone) && (
-                              <a
-                                href={`tel:${req.client_phone || client?.phone}`}
-                                className="px-3.5 py-1.5 rounded-xl bg-primary hover:bg-primary-600 text-white text-xs font-bold flex items-center gap-1 shadow-xs transition"
-                              >
-                                <span className="material-symbols-outlined text-sm">call</span>
-                                <span>Appeler</span>
-                              </a>
-                            )}
-                          </div>
-                        </div>
-
-                        {/* Provider Call Box */}
-                        <div className="p-4 rounded-2xl bg-[#FAF8F5] border border-[#ded7ca] space-y-2">
-                          <span className="text-[10px] font-bold uppercase tracking-wider text-secondary block">
-                            Intervenante Sélectionnée
-                          </span>
-                          <div className="flex items-center justify-between">
-                            <div>
-                              <strong className="font-serif text-sm text-on-surface block">
-                                {provider?.full_name || req.listing?.title || 'Prestataire'}
-                              </strong>
-                              <span className="text-xs text-on-surface-variant">
-                                {provider?.phone || 'Téléphone bureau'}
-                              </span>
-                            </div>
-                            {provider?.phone && (
-                              <a
-                                href={`tel:${provider.phone}`}
-                                className="px-3.5 py-1.5 rounded-xl bg-secondary hover:bg-secondary-600 text-white text-xs font-bold flex items-center gap-1 shadow-xs transition"
-                              >
-                                <span className="material-symbols-outlined text-sm">call</span>
-                                <span>Appeler</span>
-                              </a>
-                            )}
-                          </div>
-                        </div>
-                      </div>
-
-                      {/* Request Details */}
-                      <div className="p-3.5 rounded-2xl bg-[#f4f1ea]/60 border border-[#ded7ca] flex flex-wrap items-center justify-between gap-3 text-xs">
-                        <div>
-                          <span className="text-on-surface-variant">Date souhaitée : </span>
-                          <strong className="text-on-surface">{formatDate(req.requested_datetime)}</strong>
-                        </div>
-                        <div>
-                          <span className="text-on-surface-variant">Lieu : </span>
-                          <strong className="text-on-surface">{req.address_details || req.listing?.location || 'Alger'}</strong>
-                        </div>
-                        <div>
-                          <span className="text-on-surface-variant">Enfants : </span>
-                          <strong className="text-on-surface">{req.child_count || 1} ({req.child_age_or_grade || 'Non spécifié'})</strong>
-                        </div>
-                        <div>
-                          <span className="text-secondary font-bold">100% Espèces convenu</span>
-                        </div>
-                      </div>
-
-                      {req.note && (
-                        <p className="text-xs text-on-surface-variant italic bg-[#FAF8F5] p-3 rounded-xl border border-[#ded7ca]">
-                          « {req.note} »
-                        </p>
-                      )}
-
-                    </div>
-                  );
-                })}
-              </div>
-            )}
-          </div>
-        )}
-
-        {/* TAB 2: CANDIDATURES PRESTATAIRES */}
+        {/* TAB 1: CANDIDATURES PRESTATAIRES (MAIN SCREEN) */}
         {activeTab === 'candidates' && (
           <div className="space-y-6">
+            {/* Header & Link to 7 Pieces Checklist */}
             <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 bg-surface-container-lowest p-6 rounded-3xl border border-[#ded7ca]">
               <div>
                 <h3 className="font-serif font-bold text-xl text-on-surface">
-                  Candidatures Prestataires en Attente de Vérification
+                  Gestion Complète des Candidatures Prestataires
                 </h3>
                 <p className="text-xs sm:text-sm text-on-surface-variant mt-1">
-                  Profils inscrits en tant que prestataire avec statut « En attente physique ». Examinez leur dossier physique pour délivrer le Sceau Or ou rejeter leur candidature.
+                  Chaque statut est affiché en direct. Vous pouvez modifier le statut d'un prestataire directement ici ou ouvrir l'espace de vérification pour examiner ses 7 pièces physiques.
                 </p>
               </div>
               <Link
@@ -537,42 +409,125 @@ export default function AdminDashboardPage() {
                 className="px-4 py-2.5 rounded-2xl bg-secondary text-white text-xs font-bold hover:bg-secondary-600 transition flex items-center gap-1.5 shrink-0 shadow-xs"
               >
                 <span className="material-symbols-outlined text-base">fact_check</span>
-                <span>Ouvrir l'Espace Vérifications</span>
+                <span>Ouvrir l'Espace 7 Pièces</span>
               </Link>
             </div>
 
-            {pendingCandidates.length === 0 ? (
+            {/* Status Filter Tabs & Search Bar */}
+            <div className="flex flex-col md:flex-row md:items-center justify-between gap-3 bg-surface-container-lowest p-4 rounded-3xl border border-[#ded7ca]">
+              {/* Filter Pills */}
+              <div className="flex items-center gap-1.5 overflow-x-auto pb-1 md:pb-0">
+                {[
+                  { key: 'all', label: `Tous (${allProviderProfiles.length})` },
+                  { key: 'en_attente_physique', label: `En attente bureau (${pendingCandidates.length})` },
+                  { key: 'non_verifie', label: `Non examinés (${unreviewedCandidates.length})` },
+                  { key: 'verifie_en_main_propre', label: `Sceau Or (${verifiedCandidates.length})` },
+                  { key: 'suspendu', label: `Rejetés (${suspendedCandidates.length})` },
+                ].map((tab) => (
+                  <button
+                    key={tab.key}
+                    type="button"
+                    onClick={() => setCandidateStatusFilter(tab.key)}
+                    className={`px-3.5 py-1.5 rounded-xl text-xs font-bold transition whitespace-nowrap cursor-pointer ${
+                      candidateStatusFilter === tab.key
+                        ? 'bg-primary text-white shadow-xs'
+                        : 'bg-[#FAF8F5] text-on-surface-variant hover:text-on-surface border border-[#ded7ca]'
+                    }`}
+                  >
+                    {tab.label}
+                  </button>
+                ))}
+              </div>
+
+              {/* Search Bar */}
+              <div className="relative w-full md:w-72">
+                <span className="material-symbols-outlined absolute left-3 top-1/2 -translate-y-1/2 text-outline text-lg pointer-events-none">
+                  search
+                </span>
+                <input
+                  type="text"
+                  value={candidateSearch}
+                  onChange={(e) => setCandidateSearch(e.target.value)}
+                  placeholder="Rechercher nom, tél, commune..."
+                  className="w-full pl-9 pr-8 py-1.5 rounded-xl bg-[#FAF8F5] border border-[#ded7ca] text-xs text-on-surface focus:outline-none focus:border-primary transition"
+                />
+                {candidateSearch && (
+                  <button
+                    type="button"
+                    onClick={() => setCandidateSearch('')}
+                    className="absolute right-2.5 top-1/2 -translate-y-1/2 text-outline hover:text-on-surface text-sm"
+                  >
+                    ✕
+                  </button>
+                )}
+              </div>
+            </div>
+
+            {/* Candidates Grid */}
+            {filteredCandidates.length === 0 ? (
               <div className="bg-surface-container-lowest p-12 rounded-3xl border border-[#ded7ca] text-center space-y-3">
-                <span className="material-symbols-outlined text-4xl text-emerald-600">check_circle</span>
-                <h4 className="font-serif text-lg font-bold text-on-surface">Aucune candidature en attente</h4>
+                <span className="material-symbols-outlined text-4xl text-outline">search_off</span>
+                <h4 className="font-serif text-lg font-bold text-on-surface">Aucune candidature trouvée</h4>
                 <p className="text-xs text-on-surface-variant max-w-sm mx-auto">
-                  Toutes les candidatures de prestataires ont été traitées (certifiées avec le Sceau Or ou rejetées).
+                  Aucun prestataire ne correspond aux filtres sélectionnés ({candidateStatusFilter !== 'all' ? `filtre: ${candidateStatusFilter}` : ''} {candidateSearch ? `recherche: "${candidateSearch}"` : ''}).
                 </p>
+                {(candidateStatusFilter !== 'all' || candidateSearch) && (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setCandidateStatusFilter('all');
+                      setCandidateSearch('');
+                    }}
+                    className="px-4 py-2 rounded-xl bg-surface-container border border-[#ded7ca] text-xs font-bold text-on-surface hover:bg-[#ede8df] transition"
+                  >
+                    Réinitialiser les filtres
+                  </button>
+                )}
               </div>
             ) : (
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                {pendingCandidates.map((candidate) => {
+                {filteredCandidates.map((candidate) => {
                   const candidateListing = listings.find(l => l.provider_id === candidate.id);
                   const candidateDossierCode = `CAND-ALG-${candidate.id.slice(-4).toUpperCase()}`;
+                  const isHighlighted = candidate.id === highlightId;
+                  const isUpdating = updatingCandidateId === candidate.id;
+                  const currentStatus = candidate.verification_status || 'non_verifie';
 
                   return (
                     <div
                       key={candidate.id}
-                      className="bg-surface-container-lowest rounded-3xl border border-[#ded7ca] p-6 shadow-sm space-y-4 hover:border-secondary/40 transition"
+                      className={`bg-surface-container-lowest rounded-3xl border p-6 shadow-sm space-y-4 transition ${
+                        isHighlighted 
+                          ? 'border-primary ring-2 ring-primary/40 bg-amber-50/20' 
+                          : 'border-[#ded7ca] hover:border-secondary/40'
+                      }`}
                     >
+                      {/* Top Row: Name, Dossier Code, Badge */}
                       <div className="flex items-start justify-between gap-3 border-b border-[#ded7ca]/60 pb-3">
-                        <div className="space-y-1">
-                          <div className="flex items-center gap-2">
-                            <span className="font-serif font-bold text-base text-on-surface">
-                              {candidate.full_name}
-                            </span>
-                            <span className="text-[10px] px-2 py-0.5 rounded-full bg-amber-50 text-amber-800 border border-amber-300 font-bold">
-                              En attente physique
+                        <div className="flex items-center gap-3">
+                          <div className="w-10 h-10 rounded-full bg-primary-container text-white font-bold text-sm flex items-center justify-center shrink-0 shadow-xs">
+                            {candidate.full_name?.charAt(0) || 'P'}
+                          </div>
+                          <div>
+                            <div className="flex items-center gap-2 flex-wrap">
+                              <span className="font-serif font-bold text-base text-on-surface">
+                                {candidate.full_name}
+                              </span>
+                              {isHighlighted && (
+                                <span className="text-[10px] px-2 py-0.5 rounded-full bg-primary text-white font-bold animate-pulse">
+                                  Sélectionné
+                                </span>
+                              )}
+                            </div>
+                            <span className="text-[11px] text-outline font-mono block mt-0.5">
+                              {candidateDossierCode} • Inscrit le {formatDate(candidate.created_at)}
                             </span>
                           </div>
-                          <span className="text-[11px] text-outline font-mono">
-                            {candidateDossierCode} • Inscrit le {formatDate(candidate.created_at)}
-                          </span>
+                        </div>
+
+                        {/* Status Badge Displayed Prominently on the Card */}
+                        <div className="shrink-0">
+                          <VerificationBadge status={currentStatus} size="md" />
                         </div>
                       </div>
 
@@ -593,9 +548,9 @@ export default function AdminDashboardPage() {
                                 target="_blank"
                                 rel="noreferrer"
                                 className="text-emerald-600 hover:text-emerald-700"
-                                title="WhatsApp"
+                                title="Ouvrir WhatsApp"
                               >
-                                <span className="material-symbols-outlined text-[16px]">chat</span>
+                                <span className="material-symbols-outlined text-[17px]">chat</span>
                               </a>
                             </div>
                           ) : (
@@ -605,21 +560,33 @@ export default function AdminDashboardPage() {
 
                         <div className="p-3 bg-[#FAF8F5] rounded-2xl border border-[#ded7ca]">
                           <span className="text-[10px] uppercase font-bold text-on-surface-variant block">Commune</span>
-                          <span className="font-bold text-on-surface mt-1 block">
+                          <span className="font-bold text-on-surface mt-1 block truncate">
                             {candidate.location || 'Wilaya d\'Alger'}
                           </span>
                         </div>
                       </div>
 
                       {/* Annonce associée */}
-                      <div className="p-3 bg-[#FAF8F5] rounded-2xl border border-[#ded7ca] text-xs space-y-1">
-                        <span className="text-[10px] uppercase font-bold text-on-surface-variant block">Annonce rédigée</span>
+                      <div className="p-3.5 bg-[#FAF8F5] rounded-2xl border border-[#ded7ca] text-xs space-y-1.5">
+                        <div className="flex items-center justify-between">
+                          <span className="text-[10px] uppercase font-bold text-on-surface-variant">Annonce de Service</span>
+                          {candidateListing && (
+                            <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${
+                              candidateListing.is_active ? 'bg-emerald-100 text-emerald-800' : 'bg-slate-200 text-slate-700'
+                            }`}>
+                              {candidateListing.is_active ? 'Active' : 'En attente'}
+                            </span>
+                          )}
+                        </div>
+
                         {candidateListing ? (
                           <div>
                             <strong className="text-on-surface font-semibold block">{candidateListing.title}</strong>
                             <div className="flex items-center justify-between mt-1 text-[11px] text-on-surface-variant">
                               <span>Tarif : <strong className="text-primary">{candidateListing.price} DA</strong> / {candidateListing.price_unit || 'séance'}</span>
-                              <span className="px-2 py-0.5 rounded-full bg-primary-fixed/40 text-primary font-bold capitalize">{candidateListing.category}</span>
+                              <span className="px-2 py-0.5 rounded-full bg-primary-fixed/40 text-primary font-bold capitalize">
+                                {candidateListing.category === 'babysitting' ? 'Nounou' : 'Soutien'}
+                              </span>
                             </div>
                           </div>
                         ) : (
@@ -629,15 +596,68 @@ export default function AdminDashboardPage() {
                         )}
                       </div>
 
-                      {/* Action : lien direct vers checklist */}
-                      <div className="pt-2 flex items-center justify-end gap-3">
-                        <Link
-                          href={`/admin/prestataires?id=${candidate.id}`}
-                          className="w-full sm:w-auto px-5 py-2.5 rounded-2xl bg-secondary hover:bg-secondary-600 text-white text-xs font-bold transition flex items-center justify-center gap-1.5 shadow-xs"
-                        >
-                          <span className="material-symbols-outlined text-sm">checklist</span>
-                          <span>Examiner le dossier physique →</span>
-                        </Link>
+                      {/* Quick Status Buttons directly on the main screen */}
+                      <div className="space-y-2 pt-1 border-t border-[#ded7ca]/60">
+                        <div className="text-[10px] uppercase font-bold text-on-surface-variant">
+                          Actions Rapides de Statut :
+                        </div>
+                        <div className="flex flex-wrap items-center gap-2">
+                          {/* Sceau Or Button */}
+                          {currentStatus !== 'verifie_en_main_propre' && (
+                            <button
+                              type="button"
+                              disabled={isUpdating}
+                              onClick={() => handleUpdateCandidateStatus(candidate.id, 'verifie_en_main_propre')}
+                              className="px-3 py-1.5 rounded-xl bg-emerald-50 text-emerald-800 border border-emerald-300 hover:bg-emerald-100 text-xs font-bold flex items-center gap-1 transition cursor-pointer disabled:opacity-50"
+                              title="Valider la vérification physique et décerner le Sceau Or"
+                            >
+                              <span className="material-symbols-outlined text-sm text-emerald-600">verified</span>
+                              <span>Valider Sceau Or</span>
+                            </button>
+                          )}
+
+                          {/* En attente physique Button */}
+                          {currentStatus !== 'en_attente_physique' && (
+                            <button
+                              type="button"
+                              disabled={isUpdating}
+                              onClick={() => handleUpdateCandidateStatus(candidate.id, 'en_attente_physique')}
+                              className="px-3 py-1.5 rounded-xl bg-amber-50 text-amber-800 border border-amber-300 hover:bg-amber-100 text-xs font-bold flex items-center gap-1 transition cursor-pointer disabled:opacity-50"
+                              title="Convoquer au bureau pour le contrôle physique"
+                            >
+                              <span className="material-symbols-outlined text-sm text-amber-600">schedule</span>
+                              <span>En attente bureau</span>
+                            </button>
+                          )}
+
+                          {/* Rejeter / Suspendre Button */}
+                          {currentStatus !== 'suspendu' && (
+                            <button
+                              type="button"
+                              disabled={isUpdating}
+                              onClick={() => {
+                                if (confirm(`Confirmez-vous le rejet / la suspension de la candidature de ${candidate.full_name} ?`)) {
+                                  handleUpdateCandidateStatus(candidate.id, 'suspendu');
+                                }
+                              }}
+                              className="px-3 py-1.5 rounded-xl bg-rose-50 text-rose-800 border border-rose-300 hover:bg-rose-100 text-xs font-bold flex items-center gap-1 transition cursor-pointer disabled:opacity-50"
+                              title="Rejeter ou suspendre cette candidature"
+                            >
+                              <span className="material-symbols-outlined text-sm text-rose-600">cancel</span>
+                              <span>Rejeter</span>
+                            </button>
+                          )}
+
+                          {/* Checklist Link Button */}
+                          <Link
+                            href={`/admin/prestataires?id=${candidate.id}`}
+                            className="ml-auto px-3.5 py-1.5 rounded-xl bg-secondary text-white hover:bg-secondary-600 text-xs font-bold transition flex items-center gap-1.5 shadow-xs"
+                            title="Ouvrir la checklist des 7 pièces physiques justificatives"
+                          >
+                            <span className="material-symbols-outlined text-sm">fact_check</span>
+                            <span>Checklist 7 Pièces →</span>
+                          </Link>
+                        </div>
                       </div>
                     </div>
                   );
@@ -647,64 +667,7 @@ export default function AdminDashboardPage() {
           </div>
         )}
 
-        {/* TAB 3: UTILISATEURS */}
-        {activeTab === 'users' && (
-          <div className="bg-surface-container-lowest rounded-3xl border border-[#ded7ca] p-6 shadow-sm space-y-4">
-            <div className="flex items-center justify-between pb-3 border-b border-[#ded7ca]">
-              <h3 className="font-serif font-bold text-lg text-on-surface">Annuaire des Utilisateurs</h3>
-              <div className="flex gap-2">
-                {['all', 'client', 'provider', 'admin'].map(r => (
-                  <button
-                    key={r}
-                    onClick={() => setUserRoleFilter(r)}
-                    className={`px-3 py-1 rounded-xl text-xs font-bold ${
-                      userRoleFilter === r ? 'bg-primary text-white' : 'bg-[#FAF8F5] border border-[#ded7ca] text-on-surface-variant'
-                    }`}
-                  >
-                    {r === 'all' ? 'Tous' : r === 'client' ? 'Familles' : r === 'provider' ? 'Prestataires' : 'Admins'}
-                  </button>
-                ))}
-              </div>
-            </div>
-
-            <div className="space-y-2">
-              {filteredProfiles.map(u => (
-                <div key={u.id} className="p-3.5 rounded-2xl bg-[#FAF8F5] border border-[#ded7ca] flex items-center justify-between gap-3 text-xs">
-                  <div>
-                    <div className="flex items-center gap-2">
-                      <strong className="text-on-surface font-semibold">{u.full_name}</strong>
-                      {u.verification_status === 'en_attente_physique' && (
-                        <span className="text-[10px] px-2 py-0.2 rounded-full bg-amber-50 text-amber-800 border border-amber-300 font-bold">
-                          En attente
-                        </span>
-                      )}
-                    </div>
-                    <span className="text-on-surface-variant text-[11px] block mt-0.5">
-                      {u.phone || 'Non renseigné'} • {u.location || 'Alger'}
-                    </span>
-                  </div>
-                  <div className="flex items-center gap-2">
-                    <span className="px-2.5 py-1 rounded-full text-[10px] font-bold uppercase bg-secondary-fixed text-on-secondary-fixed-variant">
-                      {u.role}
-                    </span>
-                    {u.role === 'client' && (
-                      <button
-                        type="button"
-                        onClick={() => handlePromoteToProvider(u.id)}
-                        className="px-2.5 py-1 rounded-xl bg-secondary text-white hover:bg-secondary-600 transition text-[11px] font-bold shadow-xs cursor-pointer"
-                        title="Convertir ce compte client en prestataire"
-                      >
-                        Passer en Prestataire
-                      </button>
-                    )}
-                  </div>
-                </div>
-              ))}
-            </div>
-          </div>
-        )}
-
-        {/* TAB 3: ANNONCES */}
+        {/* TAB 2: ANNONCES CATALOGUE */}
         {activeTab === 'listings' && (
           <div className="bg-surface-container-lowest rounded-3xl border border-[#ded7ca] p-6 shadow-sm space-y-4">
             <div className="flex items-center justify-between pb-3 border-b border-[#ded7ca]">
@@ -747,6 +710,60 @@ export default function AdminDashboardPage() {
                   </div>
                 ))
               )}
+            </div>
+          </div>
+        )}
+
+        {/* TAB 3: UTILISATEURS */}
+        {activeTab === 'users' && (
+          <div className="bg-surface-container-lowest rounded-3xl border border-[#ded7ca] p-6 shadow-sm space-y-4">
+            <div className="flex items-center justify-between pb-3 border-b border-[#ded7ca]">
+              <h3 className="font-serif font-bold text-lg text-on-surface">Annuaire des Utilisateurs</h3>
+              <div className="flex gap-2">
+                {['all', 'client', 'provider', 'admin'].map(r => (
+                  <button
+                    key={r}
+                    type="button"
+                    onClick={() => setUserRoleFilter(r)}
+                    className={`px-3 py-1 rounded-xl text-xs font-bold cursor-pointer ${
+                      userRoleFilter === r ? 'bg-primary text-white' : 'bg-[#FAF8F5] border border-[#ded7ca] text-on-surface-variant'
+                    }`}
+                  >
+                    {r === 'all' ? 'Tous' : r === 'client' ? 'Familles' : r === 'provider' ? 'Prestataires' : 'Admins'}
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            <div className="space-y-2">
+              {filteredProfiles.map(u => (
+                <div key={u.id} className="p-3.5 rounded-2xl bg-[#FAF8F5] border border-[#ded7ca] flex items-center justify-between gap-3 text-xs">
+                  <div>
+                    <div className="flex items-center gap-2">
+                      <strong className="text-on-surface font-semibold">{u.full_name}</strong>
+                      <VerificationBadge status={u.verification_status || 'non_verifie'} size="sm" />
+                    </div>
+                    <span className="text-on-surface-variant text-[11px] block mt-0.5">
+                      {u.phone || 'Non renseigné'} • {u.location || 'Alger'}
+                    </span>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <span className="px-2.5 py-1 rounded-full text-[10px] font-bold uppercase bg-secondary-fixed text-on-secondary-fixed-variant">
+                      {u.role}
+                    </span>
+                    {u.role === 'client' && (
+                      <button
+                        type="button"
+                        onClick={() => handlePromoteToProvider(u.id)}
+                        className="px-2.5 py-1 rounded-xl bg-secondary text-white hover:bg-secondary-600 transition text-[11px] font-bold shadow-xs cursor-pointer"
+                        title="Convertir ce compte client en prestataire"
+                      >
+                        Passer en Prestataire
+                      </button>
+                    )}
+                  </div>
+                </div>
+              ))}
             </div>
           </div>
         )}

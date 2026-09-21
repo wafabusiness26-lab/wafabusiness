@@ -175,16 +175,19 @@ export class DataStore {
   ): Promise<boolean> {
     const updatePayload: any = {
       verification_status: status,
-      id_card_verified: checklist?.id_card_verified ?? false,
-      birth_certificate_verified: checklist?.birth_certificate_verified ?? false,
-      family_record_verified: checklist?.family_record_verified ?? false,
-      residence_certificate_verified: checklist?.residence_certificate_verified ?? false,
-      criminal_record_verified: checklist?.criminal_record_verified ?? false,
-      photos_verified: checklist?.photos_verified ?? false,
-      diploma_verified: checklist?.diploma_verified ?? false,
-      admin_verification_notes: checklist?.notes ?? null,
       admin_verification_date: status === 'verifie_en_main_propre' ? new Date().toISOString() : null,
     };
+
+    if (checklist) {
+      if (checklist.id_card_verified !== undefined) updatePayload.id_card_verified = checklist.id_card_verified;
+      if (checklist.birth_certificate_verified !== undefined) updatePayload.birth_certificate_verified = checklist.birth_certificate_verified;
+      if (checklist.family_record_verified !== undefined) updatePayload.family_record_verified = checklist.family_record_verified;
+      if (checklist.residence_certificate_verified !== undefined) updatePayload.residence_certificate_verified = checklist.residence_certificate_verified;
+      if (checklist.criminal_record_verified !== undefined) updatePayload.criminal_record_verified = checklist.criminal_record_verified;
+      if (checklist.photos_verified !== undefined) updatePayload.photos_verified = checklist.photos_verified;
+      if (checklist.diploma_verified !== undefined) updatePayload.diploma_verified = checklist.diploma_verified;
+      if (checklist.notes !== undefined) updatePayload.admin_verification_notes = checklist.notes;
+    }
 
     if (isSupabaseConfigured()) {
       const supabase = createClient();
