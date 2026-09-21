@@ -328,6 +328,20 @@ create policy "providers see their requests" on public.requests
     )
   );
 
+drop policy if exists "providers update their requests" on public.requests;
+create policy "providers update their requests" on public.requests 
+  for update using (
+    exists (
+      select 1 from public.service_listings 
+      where id = listing_id and provider_id = auth.uid()
+    )
+  ) with check (
+    exists (
+      select 1 from public.service_listings 
+      where id = listing_id and provider_id = auth.uid()
+    )
+  );
+
 drop policy if exists "clients create requests" on public.requests;
 -- Les familles créent leurs demandes (connectées ou avec coordonnées de contact direct)
 create policy "clients create requests" on public.requests 

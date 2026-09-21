@@ -4,10 +4,11 @@ import React, { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { useAuth } from '@/lib/auth-context';
 import { DataStore } from '@/lib/store';
-import { ServiceListing, ServiceRequest, Review } from '@/types';
+import { ServiceListing, ServiceRequest, Review, RequestStatus } from '@/types';
 import { VerificationBadge } from '@/components/VerificationBadge';
 import { AdminCallCard } from '@/components/AdminCallCard';
-import { formatPrice } from '@/lib/utils';
+import { formatPrice, formatDate } from '@/lib/utils';
+import { createClient, isSupabaseConfigured } from '@/lib/supabase/client';
 
 export default function ProviderDashboardPage() {
   const { profile, user } = useAuth();
@@ -17,6 +18,11 @@ export default function ProviderDashboardPage() {
   const [requests, setRequests] = useState<ServiceRequest[]>([]);
   const [reviews, setReviews] = useState<Review[]>([]);
   const [loading, setLoading] = useState(true);
+
+  // Request filter & action states
+  const [requestFilter, setRequestFilter] = useState<string>('all');
+  const [updatingRequestId, setUpdatingRequestId] = useState<string | null>(null);
+  const [actionNotice, setActionNotice] = useState<string | null>(null);
 
   const loadData = async () => {
     setLoading(true);
@@ -39,19 +45,71 @@ export default function ProviderDashboardPage() {
   useEffect(() => {
     loadData();
 
+    // Supabase Realtime Subscription on requests for this provider
+    let channel: any = null;
+    if (isSupabaseConfigured()) {
+      const supabase = createClient();
+      if (supabase) {
+        channel = supabase
+          .channel(`provider-requests-${providerId}`)
+          .on(
+            'postgres_changes',
+            { event: '*', schema: 'public', table: 'requests' },
+            () => {
+              loadData();
+            }
+          )
+          .subscribe();
+      }
+    }
+
     const handleDataChange = () => {
       loadData();
     };
 
     window.addEventListener('sm_data_change', handleDataChange);
-    return () => window.removeEventListener('sm_data_change', handleDataChange);
+    return () => {
+      window.removeEventListener('sm_data_change', handleDataChange);
+      if (channel) channel.unsubscribe();
+    };
   }, [providerId]);
+
+  const handleUpdateRequestStatus = async (requestId: string, newStatus: RequestStatus) => {
+    setUpdatingRequestId(requestId);
+    try {
+      await DataStore.updateRequestStatus(requestId, newStatus);
+      if (newStatus === 'in_progress') {
+        setActionNotice("Mission acceptée ! Vous pouvez dès à présent appeler la famille pour confirmer l'horaire et les détails.");
+      } else if (newStatus === 'completed') {
+        setActionNotice("Félicitations ! Mission marquée comme terminée. La rémunération en espèces a été perçue.");
+      } else if (newStatus === 'cancelled') {
+        setActionNotice("La demande a été déclinée.");
+      }
+      await loadData();
+      setTimeout(() => setActionNotice(null), 6000);
+    } catch (err: any) {
+      console.error(err);
+      alert("Erreur lors de la mise à jour de la demande : " + (err.message || err));
+    } finally {
+      setUpdatingRequestId(null);
+    }
+  };
 
   const isVerified = profile?.verification_status === 'verifie_en_main_propre';
 
   const avgRating = reviews.length > 0
     ? reviews.reduce((sum, r) => sum + r.rating, 0) / reviews.length
     : 5.0;
+
+  // Filtered requests
+  const filteredRequests = requests.filter((r) => {
+    if (requestFilter === 'all') return true;
+    return r.status === requestFilter;
+  });
+
+  const newRequestsCount = requests.filter(r => r.status === 'new').length;
+  const inProgressCount = requests.filter(r => r.status === 'in_progress').length;
+  const completedCount = requests.filter(r => r.status === 'completed').length;
 
   return (
     <div className="w-full bg-[#FAF8F5] min-h-screen py-8 px-4 sm:px-6 lg:px-8">
@@ -78,6 +136,13 @@ export default function ProviderDashboardPage() {
             </div>
 
             <div className="flex items-center gap-2">
+              <Link
+                href="/profile"
+                className="inline-flex items-center gap-1.5 px-4 py-2.5 rounded-2xl bg-[#FAF8F5] border border-[#ded7ca] text-on-surface hover:bg-[#ede8df] text-xs font-bold transition"
+              >
+                <span className="material-symbols-outlined text-base">person</span>
+                <span>Modifier mon profil</span>
+              </Link>
               <Link
                 href="/provider/annonces"
                 className="inline-flex items-center gap-2 px-5 py-2.5 rounded-2xl bg-primary hover:bg-primary-600 text-white text-xs font-bold shadow-xs transition"
@@ -117,6 +182,14 @@ export default function ProviderDashboardPage() {
           </div>
         )}
 
+        {/* Action Notice Alert */}
+        {actionNotice && (
+          <div className="p-4 rounded-2xl bg-secondary text-white text-xs font-bold flex items-center gap-2 shadow-md animate-fadeIn">
+            <span className="material-symbols-outlined text-base animate-pulse">check_circle</span>
+            <span>{actionNotice}</span>
+          </div>
+        )}
+
         {/* Statistiques Bento */}
         <div className="grid grid-cols-1 sm:grid-cols-4 gap-4">
           <div className="bg-surface-container-lowest rounded-2xl border border-[#ded7ca] p-5 shadow-xs">
@@ -128,33 +201,308 @@ export default function ProviderDashboardPage() {
             </div>
           </div>
 
-          <div className="bg-surface-container-lowest rounded-2xl border border-[#ded7ca] p-5 shadow-xs">
+          <div 
+            onClick={() => setRequestFilter('new')}
+            className={`bg-surface-container-lowest rounded-2xl border p-5 shadow-xs cursor-pointer transition ${
+              newRequestsCount > 0 ? 'border-amber-400 bg-amber-50/50' : 'border-[#ded7ca]'
+            }`}
+          >
             <span className="text-[11px] font-bold text-on-surface-variant uppercase tracking-wider block">
-              Missions Reçues
+              Nouvelles Demandes
             </span>
-            <div className="font-serif text-3xl font-bold text-primary mt-1">
-              {requests.length}
+            <div className="font-serif text-3xl font-bold text-primary mt-1 flex items-center justify-between">
+              <span>{newRequestsCount}</span>
+              {newRequestsCount > 0 && (
+                <span className="material-symbols-outlined text-xl text-amber-600 animate-pulse">
+                  notifications_active
+                </span>
+              )}
             </div>
+            <span className="text-[11px] text-on-surface-variant mt-1 block">À traiter d'urgence</span>
           </div>
 
-          <div className="bg-surface-container-lowest rounded-2xl border border-[#ded7ca] p-5 shadow-xs">
+          <div 
+            onClick={() => setRequestFilter('in_progress')}
+            className="bg-surface-container-lowest rounded-2xl border border-[#ded7ca] p-5 shadow-xs cursor-pointer hover:border-secondary transition"
+          >
             <span className="text-[11px] font-bold text-on-surface-variant uppercase tracking-wider block">
-              Avis Familles
+              Missions en Cours
             </span>
             <div className="font-serif text-3xl font-bold text-secondary mt-1">
-              {reviews.length}
+              {inProgressCount}
             </div>
+            <span className="text-[11px] text-on-surface-variant mt-1 block">Rendez-vous confirmés</span>
           </div>
 
           <div className="bg-surface-container-lowest rounded-2xl border border-[#ded7ca] p-5 shadow-xs">
             <span className="text-[11px] font-bold text-on-surface-variant uppercase tracking-wider block">
-              Note Famille
+              Note Familles
             </span>
             <div className="font-serif text-3xl font-bold text-wax-gold mt-1 flex items-center gap-1">
               <span>{avgRating.toFixed(1)}</span>
               <span className="material-symbols-outlined text-xl material-symbols-fill">star</span>
             </div>
+            <span className="text-[11px] text-on-surface-variant mt-1 block">{reviews.length} avis reçus</span>
           </div>
+        </div>
+
+        {/* SECTION MAJEURE : MISSIONS & DEMANDES DE SERVICES RECUES */}
+        <div className="bg-surface-container-lowest rounded-3xl border border-[#ded7ca] p-6 sm:p-8 shadow-sm space-y-6">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-[#ded7ca] pb-4">
+            <div>
+              <div className="flex items-center gap-2 font-serif font-bold text-lg text-on-surface">
+                <span className="material-symbols-outlined text-primary text-2xl">pending_actions</span>
+                <span>Demandes &amp; Réservations des Familles</span>
+                <span className="px-2 py-0.5 rounded-full bg-primary/10 text-primary text-xs font-extrabold">
+                  {requests.length}
+                </span>
+              </div>
+              <p className="text-xs text-on-surface-variant mt-1">
+                Contactez directement la famille par téléphone ou WhatsApp, acceptez la mission et convenez de la garde.
+              </p>
+            </div>
+
+            {/* Filter Tabs */}
+            <div className="flex items-center gap-1.5 overflow-x-auto pb-1 sm:pb-0">
+              {[
+                { key: 'all', label: `Toutes (${requests.length})` },
+                { key: 'new', label: `À traiter (${newRequestsCount})` },
+                { key: 'in_progress', label: `En cours (${inProgressCount})` },
+                { key: 'completed', label: `Terminées (${completedCount})` },
+              ].map((t) => (
+                <button
+                  key={t.key}
+                  type="button"
+                  onClick={() => setRequestFilter(t.key)}
+                  className={`px-3 py-1.5 rounded-xl text-xs font-bold transition whitespace-nowrap cursor-pointer ${
+                    requestFilter === t.key
+                      ? 'bg-primary text-white shadow-xs'
+                      : 'bg-[#FAF8F5] text-on-surface-variant hover:text-on-surface border border-[#ded7ca]'
+                  }`}
+                >
+                  {t.label}
+                </button>
+              ))}
+            </div>
+          </div>
+
+          {/* List of Requests */}
+          {filteredRequests.length === 0 ? (
+            <div className="p-8 text-center bg-[#FAF8F5] rounded-2xl border border-[#ded7ca] space-y-2">
+              <span className="material-symbols-outlined text-3xl text-outline">inbox</span>
+              <p className="text-xs font-semibold text-on-surface">Aucune demande dans cette catégorie.</p>
+              <p className="text-[11px] text-on-surface-variant">
+                Lorsque des familles réservent votre profil, leurs coordonnées et souhaits de garde apparaîtront ici.
+              </p>
+            </div>
+          ) : (
+            <div className="space-y-4">
+              {filteredRequests.map((req) => {
+                const clientName = req.client_name || req.client?.full_name || 'Famille';
+                const clientPhone = req.client_phone || req.client?.phone;
+                const isUpdating = updatingRequestId === req.id;
+
+                return (
+                  <div
+                    key={req.id}
+                    className={`p-5 rounded-3xl border transition space-y-4 shadow-xs ${
+                      req.status === 'new'
+                        ? 'bg-amber-50/30 border-amber-300 ring-1 ring-amber-300/40'
+                        : req.status === 'in_progress'
+                        ? 'bg-emerald-50/20 border-emerald-300'
+                        : req.status === 'completed'
+                        ? 'bg-[#FAF8F5] border-[#ded7ca]'
+                        : 'bg-slate-50 border-slate-200 opacity-75'
+                    }`}
+                  >
+                    {/* Header: Family Info & Status Badge */}
+                    <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-[#ded7ca]/60 pb-3">
+                      <div className="flex items-center gap-3">
+                        <div className="w-10 h-10 rounded-full bg-primary-container text-white font-bold text-sm flex items-center justify-center shrink-0">
+                          {clientName.charAt(0)}
+                        </div>
+                        <div>
+                          <div className="flex items-center gap-2">
+                            <span className="font-serif font-bold text-sm text-on-surface">
+                              {clientName}
+                            </span>
+                            {req.status === 'new' && (
+                              <span className="px-2 py-0.5 rounded-full bg-amber-200 text-amber-900 text-[10px] font-extrabold animate-pulse">
+                                Nouveau
+                              </span>
+                            )}
+                          </div>
+                          <span className="text-[11px] text-on-surface-variant">
+                            Reçu le {formatDate(req.created_at)}
+                          </span>
+                        </div>
+                      </div>
+
+                      {/* Status Tag */}
+                      <div>
+                        {req.status === 'new' && (
+                          <span className="inline-flex items-center gap-1 px-3 py-1 rounded-full bg-amber-100 border border-amber-300 text-amber-900 text-xs font-bold">
+                            <span className="material-symbols-outlined text-sm">schedule</span>
+                            <span>Nouvelle demande • À traiter</span>
+                          </span>
+                        )}
+                        {req.status === 'in_progress' && (
+                          <span className="inline-flex items-center gap-1 px-3 py-1 rounded-full bg-emerald-100 border border-emerald-300 text-emerald-900 text-xs font-bold">
+                            <span className="material-symbols-outlined text-sm">handshake</span>
+                            <span>Mission confirmée • En cours</span>
+                          </span>
+                        )}
+                        {req.status === 'completed' && (
+                          <span className="inline-flex items-center gap-1 px-3 py-1 rounded-full bg-blue-50 border border-blue-200 text-blue-800 text-xs font-bold">
+                            <span className="material-symbols-outlined text-sm">check_circle</span>
+                            <span>Mission terminée avec succès</span>
+                          </span>
+                        )}
+                        {req.status === 'cancelled' && (
+                          <span className="inline-flex items-center gap-1 px-3 py-1 rounded-full bg-slate-200 text-slate-700 text-xs font-bold">
+                            <span className="material-symbols-outlined text-sm">cancel</span>
+                            <span>Mission déclinée / annulée</span>
+                          </span>
+                        )}
+                      </div>
+                    </div>
+
+                    {/* Details Grid */}
+                    <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-3 text-xs">
+                      <div className="p-3 bg-surface-container-lowest rounded-2xl border border-[#ded7ca]">
+                        <span className="text-[10px] uppercase font-bold text-on-surface-variant block">Date souhaitée</span>
+                        <strong className="text-on-surface block mt-0.5">{formatDate(req.requested_datetime)}</strong>
+                      </div>
+
+                      <div className="p-3 bg-surface-container-lowest rounded-2xl border border-[#ded7ca]">
+                        <span className="text-[10px] uppercase font-bold text-on-surface-variant block">Lieu / Commune</span>
+                        <strong className="text-on-surface block mt-0.5 truncate">{req.address_details || req.listing?.location || 'Alger'}</strong>
+                      </div>
+
+                      <div className="p-3 bg-surface-container-lowest rounded-2xl border border-[#ded7ca]">
+                        <span className="text-[10px] uppercase font-bold text-on-surface-variant block">Enfants</span>
+                        <strong className="text-on-surface block mt-0.5">
+                          {req.child_count || 1} ({req.child_age_or_grade || 'Non spécifié'})
+                        </strong>
+                      </div>
+
+                      <div className="p-3 bg-surface-container-lowest rounded-2xl border border-[#ded7ca]">
+                        <span className="text-[10px] uppercase font-bold text-on-surface-variant block">Règlement convenu</span>
+                        <strong className="text-secondary font-bold block mt-0.5">
+                          {req.listing?.price ? `${req.listing.price} DA (100% Espèces)` : 'Espèces sur place'}
+                        </strong>
+                      </div>
+                    </div>
+
+                    {/* Note de la famille si présente */}
+                    {req.note && (
+                      <div className="p-3.5 rounded-2xl bg-[#FAF8F5] border border-[#ded7ca] text-xs">
+                        <span className="text-[10px] uppercase font-bold text-on-surface-variant block mb-1">
+                          Message de la famille :
+                        </span>
+                        <p className="text-on-surface italic">« {req.note} »</p>
+                      </div>
+                    )}
+
+                    {/* Direct Contact & Action Workflow Bar */}
+                    <div className="pt-2 flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3 border-t border-[#ded7ca]/60">
+                      {/* Contact Buttons */}
+                      <div className="flex items-center gap-2">
+                        {clientPhone ? (
+                          <>
+                            <a
+                              href={`tel:${clientPhone}`}
+                              className="px-3.5 py-1.5 rounded-xl bg-primary hover:bg-primary-600 text-white text-xs font-bold transition flex items-center gap-1 shadow-xs"
+                            >
+                              <span className="material-symbols-outlined text-sm">call</span>
+                              <span>Appeler : {clientPhone}</span>
+                            </a>
+                            <a
+                              href={`https://wa.me/213${clientPhone.replace(/[^0-9]/g, '').replace(/^0/, '')}`}
+                              target="_blank"
+                              rel="noreferrer"
+                              className="px-3.5 py-1.5 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold transition flex items-center gap-1 shadow-xs"
+                              title="Contacter sur WhatsApp"
+                            >
+                              <span className="material-symbols-outlined text-sm">chat</span>
+                              <span>WhatsApp</span>
+                            </a>
+                          </>
+                        ) : (
+                          <span className="text-xs text-on-surface-variant italic">Numéro non renseigné</span>
+                        )}
+                      </div>
+
+                      {/* Status Action Buttons for the Provider */}
+                      <div className="flex items-center gap-2 justify-end">
+                        {req.status === 'new' && (
+                          <>
+                            <button
+                              type="button"
+                              disabled={isUpdating}
+                              onClick={() => handleUpdateRequestStatus(req.id, 'in_progress')}
+                              className="px-4 py-2 rounded-xl bg-secondary hover:bg-secondary-600 text-white text-xs font-bold transition flex items-center gap-1 shadow-xs cursor-pointer disabled:opacity-50"
+                              title="Confirmer la disponibilité et prendre contact avec la famille"
+                            >
+                              <span className="material-symbols-outlined text-sm">check</span>
+                              <span>Accepter la mission</span>
+                            </button>
+                            <button
+                              type="button"
+                              disabled={isUpdating}
+                              onClick={() => {
+                                if (confirm("Voulez-vous décliner cette demande de garde ?")) {
+                                  handleUpdateRequestStatus(req.id, 'cancelled');
+                                }
+                              }}
+                              className="px-3.5 py-2 rounded-xl bg-surface-container border border-[#ded7ca] text-on-surface-variant hover:text-error text-xs font-bold transition cursor-pointer disabled:opacity-50"
+                              title="Décliner la mission"
+                            >
+                              <span>Décliner</span>
+                            </button>
+                          </>
+                        )}
+
+                        {req.status === 'in_progress' && (
+                          <>
+                            <button
+                              type="button"
+                              disabled={isUpdating}
+                              onClick={() => handleUpdateRequestStatus(req.id, 'completed')}
+                              className="px-4 py-2 rounded-xl bg-emerald-700 hover:bg-emerald-800 text-white text-xs font-bold transition flex items-center gap-1 shadow-xs cursor-pointer disabled:opacity-50"
+                              title="Marquer comme terminée une fois la garde réalisée et payée"
+                            >
+                              <span className="material-symbols-outlined text-sm">task_alt</span>
+                              <span>Marquer comme terminée</span>
+                            </button>
+                            <button
+                              type="button"
+                              disabled={isUpdating}
+                              onClick={() => {
+                                if (confirm("Annuler cette mission en cours ?")) {
+                                  handleUpdateRequestStatus(req.id, 'cancelled');
+                                }
+                              }}
+                              className="px-3 py-2 rounded-xl bg-rose-50 text-rose-700 border border-rose-200 hover:bg-rose-100 text-xs font-bold transition cursor-pointer disabled:opacity-50"
+                            >
+                              <span>Annuler</span>
+                            </button>
+                          </>
+                        )}
+
+                        {req.status === 'completed' && (
+                          <div className="flex items-center gap-1 text-xs text-emerald-700 font-bold">
+                            <span className="material-symbols-outlined text-sm">done_all</span>
+                            <span>Mission accomplie • Espèces perçues</span>
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          )}
         </div>
 
         {/* Mon Annonce Publiée */}

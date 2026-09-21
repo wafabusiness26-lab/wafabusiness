@@ -552,7 +552,11 @@ export class DataStore {
 
         const { data, error } = await q;
         if (!error && data) {
-          return data as ServiceRequest[];
+          let list = data as ServiceRequest[];
+          if (options?.role === 'provider' && options.userId) {
+            list = list.filter(r => r.listing?.provider_id === options.userId);
+          }
+          return list;
         }
         
         console.warn('Supabase joined query notice, executing resilient fallback:', error?.message);
@@ -578,11 +582,17 @@ export class DataStore {
           this.getListings({ includeUnverified: true }),
         ]);
 
-        return rawRequests.map(r => ({
+        let hydrated = rawRequests.map(r => ({
           ...r,
           client: profiles.find(p => p.id === r.client_id),
           listing: listings.find(l => l.id === r.listing_id),
         })) as ServiceRequest[];
+
+        if (options?.role === 'provider' && options.userId) {
+          hydrated = hydrated.filter(r => r.listing?.provider_id === options.userId);
+        }
+
+        return hydrated;
       } catch (e) {
         console.error('Supabase getRequests fallback error:', e);
         return [];
@@ -749,6 +759,10 @@ export class DataStore {
       if (error) {
         console.error('Supabase updateRequestStatus error:', error);
         return false;
+      }
+
+      if (typeof window !== 'undefined') {
+        window.dispatchEvent(new CustomEvent('sm_data_change', { detail: { key: 'requests' } }));
       }
       return true;
     }

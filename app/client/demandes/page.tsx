@@ -66,13 +66,22 @@ export default function ClientRequestsPage() {
             </p>
           </div>
 
-          <Link
-            href="/services"
-            className="inline-flex items-center gap-2 px-5 py-2.5 rounded-2xl bg-primary hover:bg-primary-600 text-white text-xs font-bold shadow-xs transition shrink-0"
-          >
-            <span>Explorer d'autres profils</span>
-            <span className="material-symbols-outlined text-sm">arrow_forward</span>
-          </Link>
+          <div className="flex items-center gap-2">
+            <Link
+              href="/profile"
+              className="inline-flex items-center gap-2 px-4 py-2.5 rounded-2xl bg-surface-container-lowest border border-[#ded7ca] text-on-surface hover:bg-[#ede8df] text-xs font-bold transition shrink-0"
+            >
+              <span className="material-symbols-outlined text-base">person</span>
+              <span>Mon Profil</span>
+            </Link>
+            <Link
+              href="/services"
+              className="inline-flex items-center gap-2 px-5 py-2.5 rounded-2xl bg-primary hover:bg-primary-600 text-white text-xs font-bold shadow-xs transition shrink-0"
+            >
+              <span>Explorer d'autres profils</span>
+              <span className="material-symbols-outlined text-sm">arrow_forward</span>
+            </Link>
+          </div>
         </div>
 
         {/* Filtres de statut en pilules organiques */}

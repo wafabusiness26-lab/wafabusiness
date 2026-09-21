@@ -1,7 +1,10 @@
 'use client';
 
-import React from 'react';
+import React, { useState } from 'react';
 import Link from 'next/link';
+import { useRouter } from 'next/navigation';
+import { useAuth } from '@/lib/auth-context';
+import { DataStore } from '@/lib/store';
 import { 
   Baby, 
   GraduationCap, 
@@ -19,6 +22,22 @@ import { TARIFS_INDICATIFS, PHYSICAL_CHECKLIST, VERIFICATION_DOCUMENTS_DETAILED,
 import { AdminCallCard } from '@/components/AdminCallCard';
 
 export default function BecomeProviderPage() {
+  const router = useRouter();
+  const { user, profile, role } = useAuth();
+  const [upgrading, setUpgrading] = useState(false);
+
+  const handleUpgrade = async () => {
+    if (!user) return;
+    setUpgrading(true);
+    try {
+      await DataStore.updateUserRole(user.id, 'provider');
+      router.push('/provider/annonces');
+    } catch (e: any) {
+      alert("Erreur lors de l'activation : " + (e.message || e));
+      setUpgrading(false);
+    }
+  };
+
   return (
     <div className="space-y-16 sm:space-y-24 py-10">
       
@@ -40,22 +59,46 @@ export default function BecomeProviderPage() {
               Travaillez avec des familles respectueuses dans votre commune d'Alger. Fixez librement vos tarifs en Dinars Algériens (DA), vos disponibilités et recevez vos paiements directement en espèces de main à main.
             </p>
 
-            <div className="pt-2 flex flex-col sm:flex-row gap-4">
-              <Link
-                href="/provider/annonces"
-                className="px-8 py-3.5 bg-indigo-600 hover:bg-indigo-700 text-white font-black text-sm rounded-xl shadow-lg transition text-center flex items-center justify-center gap-2"
-              >
-                <span>Publier mon annonce maintenant</span>
-                <ArrowRight className="w-4 h-4" />
-              </Link>
-              <a
-                href={`tel:${ADMIN_CONTACT.phone}`}
-                className="px-6 py-3.5 bg-white/10 hover:bg-white/20 text-white font-bold text-sm rounded-xl transition text-center flex items-center justify-center gap-2 border border-white/10"
-              >
-                <PhoneCall className="w-4 h-4" />
-                <span>Parler au coordinateur</span>
-              </a>
-            </div>
+            {/* Si un utilisateur client est connecté, lui permettre de basculer en un clic */}
+            {user && role === 'client' ? (
+              <div className="p-5 bg-amber-500/20 border border-amber-400/40 rounded-2xl space-y-3">
+                <div className="flex items-center gap-2 text-amber-200 text-xs font-bold">
+                  <span className="material-symbols-outlined text-base">info</span>
+                  <span>Compte Famille connecté ({profile?.full_name})</span>
+                </div>
+                <p className="text-xs text-slate-200">
+                  Votre compte est actuellement configuré comme compte Famille. Pour publier une annonce et proposer vos services, activez votre profil Prestataire :
+                </p>
+                <div className="pt-1 flex flex-col sm:flex-row gap-3">
+                  <button
+                    type="button"
+                    onClick={handleUpgrade}
+                    disabled={upgrading}
+                    className="px-6 py-3 bg-amber-400 hover:bg-amber-500 text-slate-950 font-bold text-xs rounded-xl shadow-md transition flex items-center justify-center gap-2 cursor-pointer disabled:opacity-50"
+                  >
+                    <span className="material-symbols-outlined text-base">how_to_reg</span>
+                    <span>{upgrading ? 'Activation en cours...' : 'Passer mon profil en Prestataire & Publier mon annonce'}</span>
+                  </button>
+                </div>
+              </div>
+            ) : (
+              <div className="pt-2 flex flex-col sm:flex-row gap-4">
+                <Link
+                  href="/provider/annonces"
+                  className="px-8 py-3.5 bg-indigo-600 hover:bg-indigo-700 text-white font-black text-sm rounded-xl shadow-lg transition text-center flex items-center justify-center gap-2"
+                >
+                  <span>Publier mon annonce maintenant</span>
+                  <ArrowRight className="w-4 h-4" />
+                </Link>
+                <a
+                  href={`tel:${ADMIN_CONTACT.phone}`}
+                  className="px-6 py-3.5 bg-white/10 hover:bg-white/20 text-white font-bold text-sm rounded-xl transition text-center flex items-center justify-center gap-2 border border-white/10"
+                >
+                  <PhoneCall className="w-4 h-4" />
+                  <span>Parler au coordinateur</span>
+                </a>
+              </div>
+            )}
 
           </div>
         </div>

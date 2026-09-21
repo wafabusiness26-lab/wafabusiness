@@ -236,7 +236,7 @@ export const Navbar: React.FC = () => {
               Les 57 Communes
             </Link>
 
-            {role !== 'provider' && role !== 'admin' && (
+            {!profile && (
               <Link
                 href="/devenir-prestataire"
                 className={`px-4 py-2 rounded-full text-[13px] font-semibold transition-all ${
@@ -251,16 +251,28 @@ export const Navbar: React.FC = () => {
 
             {/* Role specific links for Desktop */}
             {role === 'client' && (
-              <Link
-                href="/client/demandes"
-                className={`px-3 py-1.5 rounded-full text-[12px] font-bold transition-all ${
-                  isActive('/client/demandes')
-                    ? 'bg-primary text-white'
-                    : 'text-primary hover:bg-primary-fixed/60'
-                }`}
-              >
-                Mes Demandes
-              </Link>
+              <>
+                <Link
+                  href="/client/demandes"
+                  className={`px-3 py-1.5 rounded-full text-[12px] font-bold transition-all ${
+                    isActive('/client/demandes')
+                      ? 'bg-primary text-white'
+                      : 'text-primary hover:bg-primary-fixed/60'
+                  }`}
+                >
+                  Mes Demandes
+                </Link>
+                <Link
+                  href="/profile"
+                  className={`px-3 py-1.5 rounded-full text-[12px] font-bold transition-all ${
+                    isActive('/profile')
+                      ? 'bg-secondary text-white'
+                      : 'text-secondary hover:bg-secondary-fixed/60'
+                  }`}
+                >
+                  Mon Profil
+                </Link>
+              </>
             )}
 
             {role === 'provider' && (
@@ -408,17 +420,23 @@ export const Navbar: React.FC = () => {
             {/* User Account / Profile */}
             {profile ? (
               <div className="flex items-center gap-1.5 sm:gap-2 bg-surface-container-low pl-1 pr-2 sm:pr-3 py-1 rounded-full shadow-subtle border border-[#ded7ca]">
-                <div className="w-7 h-7 sm:w-8 sm:h-8 rounded-full bg-primary-container text-white flex items-center justify-center font-bold text-xs">
-                  {profile.full_name?.charAt(0) || 'U'}
-                </div>
-                <div className="hidden sm:flex flex-col text-left">
-                  <span className="text-[12px] text-on-surface font-semibold leading-tight max-w-[100px] truncate">
-                    {profile.full_name}
-                  </span>
-                  <span className="text-[10px] text-primary font-medium leading-none capitalize">
-                    {role === 'admin' ? 'Coordinateur' : role === 'provider' ? 'Prestataire' : 'Famille'}
-                  </span>
-                </div>
+                <Link
+                  href="/profile"
+                  title="Gérer mon profil & coordonnées"
+                  className="flex items-center gap-1.5 sm:gap-2 hover:opacity-80 transition cursor-pointer"
+                >
+                  <div className="w-7 h-7 sm:w-8 sm:h-8 rounded-full bg-primary-container text-white flex items-center justify-center font-bold text-xs">
+                    {profile.full_name?.charAt(0) || 'U'}
+                  </div>
+                  <div className="hidden sm:flex flex-col text-left">
+                    <span className="text-[12px] text-on-surface font-semibold leading-tight max-w-[100px] truncate">
+                      {profile.full_name}
+                    </span>
+                    <span className="text-[10px] text-primary font-medium leading-none capitalize">
+                      {role === 'admin' ? 'Coordinateur' : role === 'provider' ? 'Prestataire' : 'Famille'}
+                    </span>
+                  </div>
+                </Link>
                 <button
                   onClick={() => logout()}
                   title="Se déconnecter"
@@ -513,7 +531,7 @@ export const Navbar: React.FC = () => {
                   Les 5 rubriques officielles
                 </div>
 
-                {CORE_5_PAGES.map((page) => {
+                {CORE_5_PAGES.filter(p => !profile || p.href !== '/devenir-prestataire').map((page) => {
                   const pageIsActive = isActive(page.href);
                   return (
                     <Link
@@ -572,17 +590,30 @@ export const Navbar: React.FC = () => {
                   </div>
 
                   {role === 'client' && (
-                    <Link
-                      href="/client/demandes"
-                      onClick={() => setMobileMenuOpen(false)}
-                      className="flex items-center justify-between p-2.5 rounded-2xl bg-primary-fixed/40 text-primary font-bold text-xs hover:bg-primary-fixed/60 transition"
-                    >
-                      <div className="flex items-center gap-2">
-                        <span className="material-symbols-outlined text-[18px]">calendar_month</span>
-                        <span>Mes Demandes de Garde</span>
-                      </div>
-                      <span className="material-symbols-outlined text-sm">arrow_forward</span>
-                    </Link>
+                    <div className="space-y-1">
+                      <Link
+                        href="/client/demandes"
+                        onClick={() => setMobileMenuOpen(false)}
+                        className="flex items-center justify-between p-2.5 rounded-2xl bg-primary-fixed/40 text-primary font-bold text-xs hover:bg-primary-fixed/60 transition"
+                      >
+                        <div className="flex items-center gap-2">
+                          <span className="material-symbols-outlined text-[18px]">calendar_month</span>
+                          <span>Mes Demandes de Garde</span>
+                        </div>
+                        <span className="material-symbols-outlined text-sm">arrow_forward</span>
+                      </Link>
+                      <Link
+                        href="/profile"
+                        onClick={() => setMobileMenuOpen(false)}
+                        className="flex items-center justify-between p-2.5 rounded-2xl bg-secondary-fixed/40 text-secondary font-bold text-xs hover:bg-secondary-fixed/60 transition"
+                      >
+                        <div className="flex items-center gap-2">
+                          <span className="material-symbols-outlined text-[18px]">person</span>
+                          <span>Mon Profil (Passer Prestataire)</span>
+                        </div>
+                        <span className="material-symbols-outlined text-sm">arrow_forward</span>
+                      </Link>
+                    </div>
                   )}
 
                   {role === 'provider' && (
