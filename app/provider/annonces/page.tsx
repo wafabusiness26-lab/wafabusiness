@@ -30,6 +30,7 @@ export default function ProviderAnnoncesPage() {
   const { profile, user, loading: authLoading } = useAuth();
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
+  const [upgrading, setUpgrading] = useState(false);
   const [submittedSuccess, setSubmittedSuccess] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -53,7 +54,28 @@ export default function ProviderAnnoncesPage() {
     }
   }, [authLoading, user, router]);
 
-  // 2. Chargement de l'annonce existante pour l'utilisateur authentifié
+  // 2. Client-side guard : Redirection si l'utilisateur connecté n'a pas le rôle provider
+  useEffect(() => {
+    if (!authLoading && user && profile && profile.role !== 'provider' && profile.role !== 'admin') {
+      router.replace('/devenir-prestataire?source=guard_client');
+    }
+  }, [authLoading, user, profile, router]);
+
+  const handleUpgradeToProvider = async () => {
+    if (!user || !profile) return;
+    setUpgrading(true);
+    setError(null);
+    try {
+      await DataStore.updateUserRole(user.id, 'provider');
+      window.location.reload();
+    } catch (err: any) {
+      console.error(err);
+      setError(err.message || "Impossible d'activer le profil prestataire.");
+      setUpgrading(false);
+    }
+  };
+
+  // 3. Chargement de l'annonce existante pour l'utilisateur authentifié
   useEffect(() => {
     if (authLoading || !user) return;
     const providerId = user.id;
@@ -122,6 +144,7 @@ export default function ProviderAnnoncesPage() {
 
     setSaving(true);
     setError(null);
+    setSubmittedSuccess(false);
 
     try {
       if (profile) {
@@ -148,7 +171,11 @@ export default function ProviderAnnoncesPage() {
 
       setSubmittedSuccess(true);
     } catch (err: any) {
+      console.error('Erreur soumission annonce:', err);
       setError(err.message || 'Une erreur est survenue lors de l\'enregistrement de votre annonce.');
+      if (typeof window !== 'undefined') {
+        window.scrollTo({ top: 0, behavior: 'smooth' });
+      }
     } finally {
       setSaving(false);
     }
@@ -195,6 +222,79 @@ export default function ProviderAnnoncesPage() {
           >
             <span>Créer mon compte prestataire</span>
             <ArrowRight className="w-4 h-4" />
+          </Link>
+        </div>
+      </div>
+    );
+  }
+
+  if (profile && profile.role !== 'provider' && profile.role !== 'admin') {
+    return (
+      <div className="max-w-xl mx-auto my-16 p-8 bg-surface-container-lowest rounded-3xl border border-amber-200 text-center space-y-6 shadow-sm">
+        <div className="w-16 h-16 bg-amber-100 text-amber-800 rounded-3xl flex items-center justify-center mx-auto shadow-inner">
+          <span className="material-symbols-outlined text-3xl">switch_account</span>
+        </div>
+        <div className="space-y-2">
+          <span className="text-[11px] font-bold uppercase tracking-wider text-amber-800 bg-amber-50 px-3 py-1 rounded-full border border-amber-200">
+            Compte Famille / Client Détecté
+          </span>
+          <h2 className="font-serif text-2xl font-bold text-on-surface">
+            Activation du profil Prestataire requise
+          </h2>
+          <p className="text-xs sm:text-sm text-on-surface-variant leading-relaxed max-w-md mx-auto">
+            Vous êtes connecté avec le compte Famille de <strong>{profile.full_name}</strong>. Seuls les comptes avec le statut prestataire peuvent rédiger et publier des annonces.
+          </p>
+        </div>
+
+        {error && (
+          <div className="p-4 rounded-2xl bg-rose-50 border border-rose-200 text-rose-800 text-xs flex items-center gap-2 font-bold text-left">
+            <AlertCircle className="w-4 h-4 text-rose-600 shrink-0" />
+            <span>{error}</span>
+          </div>
+        )}
+
+        <div className="p-5 rounded-2xl bg-[#FAF8F5] border border-[#ded7ca] text-xs text-left space-y-3">
+          <div className="flex items-center gap-2 font-bold text-on-surface">
+            <span className="material-symbols-outlined text-base text-secondary">verified_user</span>
+            <span>Vous souhaitez proposer vos services sur Amana ?</span>
+          </div>
+          <p className="text-on-surface-variant leading-relaxed">
+            Activez votre statut de prestataire pour soumettre votre annonce et planifier votre vérification physique au bureau.
+          </p>
+          <div className="pt-2 flex flex-col sm:flex-row gap-2.5">
+            <button
+              type="button"
+              disabled={upgrading}
+              onClick={handleUpgradeToProvider}
+              className="flex-1 py-3 px-4 bg-secondary hover:bg-secondary-600 text-white font-bold text-xs rounded-xl transition flex items-center justify-center gap-2 shadow-xs cursor-pointer disabled:opacity-50"
+            >
+              {upgrading ? (
+                <>
+                  <Loader2 className="w-4 h-4 animate-spin" />
+                  <span>Activation en cours...</span>
+                </>
+              ) : (
+                <>
+                  <span className="material-symbols-outlined text-base">how_to_reg</span>
+                  <span>Activer mon profil Prestataire</span>
+                </>
+              )}
+            </button>
+            <Link
+              href="/devenir-prestataire"
+              className="py-3 px-4 bg-surface-container-lowest border border-[#ded7ca] hover:bg-[#ede8df] text-on-surface font-semibold text-xs rounded-xl transition text-center"
+            >
+              En savoir plus
+            </Link>
+          </div>
+        </div>
+
+        <div className="pt-1">
+          <Link
+            href="/client/demandes"
+            className="text-xs text-on-surface-variant hover:text-primary transition underline font-medium"
+          >
+            ← Retour à mon espace Famille
           </Link>
         </div>
       </div>
@@ -504,6 +604,17 @@ export default function ProviderAnnoncesPage() {
               Aucun document d'identité n'est téléversé sur le site. Notre coordinateur vous contactera pour convenir d'un rendez-vous de vérification physique à Alger avant d'activer votre badge de certification.
             </p>
           </div>
+
+          {/* Message d'erreur visible directement près du bouton */}
+          {error && (
+            <div className="p-4 rounded-2xl bg-rose-50 border border-rose-200 text-rose-800 text-xs sm:text-sm flex items-start gap-3 font-medium animate-in fade-in">
+              <AlertCircle className="w-5 h-5 text-rose-600 shrink-0 mt-0.5" />
+              <div className="space-y-1">
+                <span className="font-bold block">Échec de l'enregistrement de l'annonce</span>
+                <p className="text-xs leading-relaxed">{error}</p>
+              </div>
+            </div>
+          )}
 
           {/* Bouton de validation */}
           <div className="pt-4 border-t border-slate-100 flex justify-end">

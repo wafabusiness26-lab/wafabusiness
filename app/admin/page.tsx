@@ -115,6 +115,30 @@ export default function AdminDashboardPage() {
     await loadAllData();
   };
 
+  const handlePromoteToProvider = async (userId: string) => {
+    if (!confirm('Voulez-vous attribuer le rôle Prestataire à cet utilisateur ? Son profil passera en attente de vérification physique.')) {
+      return;
+    }
+    try {
+      await DataStore.updateUserRole(userId, 'provider');
+      await loadAllData();
+    } catch (e: any) {
+      alert("Erreur lors de l'attribution du rôle : " + (e.message || e));
+    }
+  };
+
+  const handleDeleteListing = async (listingId: string, title: string) => {
+    if (!confirm(`Confirmez-vous la suppression définitive de l'annonce "${title}" ?`)) {
+      return;
+    }
+    try {
+      await DataStore.deleteListing(listingId);
+      await loadAllData();
+    } catch (e: any) {
+      alert("Erreur lors de la suppression de l'annonce : " + (e.message || e));
+    }
+  };
+
   const filteredRequests = requests.filter((r) => {
     if (requestStatusFilter === 'all') return true;
     return r.status === requestStatusFilter;
@@ -645,14 +669,35 @@ export default function AdminDashboardPage() {
 
             <div className="space-y-2">
               {filteredProfiles.map(u => (
-                <div key={u.id} className="p-3.5 rounded-2xl bg-[#FAF8F5] border border-[#ded7ca] flex items-center justify-between text-xs">
+                <div key={u.id} className="p-3.5 rounded-2xl bg-[#FAF8F5] border border-[#ded7ca] flex items-center justify-between gap-3 text-xs">
                   <div>
-                    <strong className="text-on-surface font-semibold block">{u.full_name}</strong>
-                    <span className="text-on-surface-variant text-[11px]">{u.phone || 'Non renseigné'} • {u.location || 'Alger'}</span>
+                    <div className="flex items-center gap-2">
+                      <strong className="text-on-surface font-semibold">{u.full_name}</strong>
+                      {u.verification_status === 'en_attente_physique' && (
+                        <span className="text-[10px] px-2 py-0.2 rounded-full bg-amber-50 text-amber-800 border border-amber-300 font-bold">
+                          En attente
+                        </span>
+                      )}
+                    </div>
+                    <span className="text-on-surface-variant text-[11px] block mt-0.5">
+                      {u.phone || 'Non renseigné'} • {u.location || 'Alger'}
+                    </span>
                   </div>
-                  <span className="px-2.5 py-1 rounded-full text-[10px] font-bold uppercase bg-secondary-fixed text-on-secondary-fixed-variant">
-                    {u.role}
-                  </span>
+                  <div className="flex items-center gap-2">
+                    <span className="px-2.5 py-1 rounded-full text-[10px] font-bold uppercase bg-secondary-fixed text-on-secondary-fixed-variant">
+                      {u.role}
+                    </span>
+                    {u.role === 'client' && (
+                      <button
+                        type="button"
+                        onClick={() => handlePromoteToProvider(u.id)}
+                        className="px-2.5 py-1 rounded-xl bg-secondary text-white hover:bg-secondary-600 transition text-[11px] font-bold shadow-xs cursor-pointer"
+                        title="Convertir ce compte client en prestataire"
+                      >
+                        Passer en Prestataire
+                      </button>
+                    )}
+                  </div>
                 </div>
               ))}
             </div>
@@ -668,25 +713,40 @@ export default function AdminDashboardPage() {
             </div>
 
             <div className="space-y-3">
-              {listings.map(l => (
-                <div key={l.id} className="p-4 rounded-2xl bg-[#FAF8F5] border border-[#ded7ca] flex flex-col sm:flex-row sm:items-center justify-between gap-3 text-xs">
-                  <div>
-                    <strong className="font-serif text-sm text-on-surface block">{l.title}</strong>
-                    <span className="text-on-surface-variant text-[11px]">
-                      Prestataire : {l.provider?.full_name || 'Non spécifié'} • {l.location || 'Alger'}
-                    </span>
-                  </div>
-                  <div className="flex items-center gap-3">
-                    <strong className="text-primary font-bold">{l.price} DA</strong>
-                    <Link
-                      href={`/services/${l.id}`}
-                      className="px-3 py-1.5 rounded-xl bg-surface-container-lowest border border-[#ded7ca] font-semibold text-xs hover:bg-[#ede8df]"
-                    >
-                      Voir profil public
-                    </Link>
-                  </div>
+              {listings.length === 0 ? (
+                <div className="p-8 text-center text-xs text-on-surface-variant bg-[#FAF8F5] rounded-2xl border border-[#ded7ca]">
+                  Aucune annonce enregistrée dans le catalogue pour le moment.
                 </div>
-              ))}
+              ) : (
+                listings.map(l => (
+                  <div key={l.id} className="p-4 rounded-2xl bg-[#FAF8F5] border border-[#ded7ca] flex flex-col sm:flex-row sm:items-center justify-between gap-3 text-xs">
+                    <div>
+                      <strong className="font-serif text-sm text-on-surface block">{l.title}</strong>
+                      <span className="text-on-surface-variant text-[11px]">
+                        Prestataire : {l.provider?.full_name || 'Non spécifié'} • {l.location || 'Alger'}
+                      </span>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <strong className="text-primary font-bold">{l.price} DA</strong>
+                      <Link
+                        href={`/services/${l.id}`}
+                        className="px-3 py-1.5 rounded-xl bg-surface-container-lowest border border-[#ded7ca] font-semibold text-xs hover:bg-[#ede8df]"
+                      >
+                        Voir profil
+                      </Link>
+                      <button
+                        type="button"
+                        onClick={() => handleDeleteListing(l.id, l.title)}
+                        className="px-3 py-1.5 rounded-xl bg-rose-50 text-rose-700 border border-rose-200 hover:bg-rose-100 font-semibold text-xs flex items-center gap-1 transition cursor-pointer"
+                        title="Supprimer définitivement l'annonce"
+                      >
+                        <span className="material-symbols-outlined text-sm">delete</span>
+                        <span>Supprimer</span>
+                      </button>
+                    </div>
+                  </div>
+                ))
+              )}
             </div>
           </div>
         )}

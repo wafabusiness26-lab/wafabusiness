@@ -192,8 +192,26 @@ returns trigger as $$
 begin
   -- Permettre les modifications directes via SQL Editor / Service Role (auth.uid() est null)
   if auth.uid() is not null and not public.is_admin() then
-    new.role := old.role;
-    new.verification_status := old.verification_status;
+    -- 1. Anti-Escalade Admin : un utilisateur ne peut JAMAIS s'octroyer le rôle admin
+    if new.role = 'admin' then
+      new.role := old.role;
+    end if;
+
+    -- 2. Transition Client -> Provider : autorisée (mise en attente physique obligatoire)
+    if old.role = 'client' and new.role = 'provider' then
+      new.role := 'provider';
+      if old.verification_status != 'verifie_en_main_propre' then
+        new.verification_status := 'en_attente_physique';
+      end if;
+    elsif new.role != old.role then
+      new.role := old.role;
+    end if;
+
+    -- 3. Verrouillage du badge vérifié (seul l'administrateur peut accorder 'verifie_en_main_propre' ou 'suspendu')
+    if new.role = old.role then
+      new.verification_status := old.verification_status;
+    end if;
+
     new.id_card_verified := old.id_card_verified;
     new.birth_certificate_verified := old.birth_certificate_verified;
     new.family_record_verified := old.family_record_verified;
@@ -264,10 +282,22 @@ drop policy if exists "providers update own listings" on public.service_listings
 drop policy if exists "providers delete own listings" on public.service_listings;
 
 create policy "providers insert own listings" on public.service_listings 
-  for insert with check (provider_id = auth.uid());
+  for insert with check (
+    provider_id = auth.uid() 
+    and exists (
+      select 1 from public.profiles 
+      where id = auth.uid() and role = 'provider'
+    )
+  );
 
 create policy "providers update own listings" on public.service_listings 
-  for update using (provider_id = auth.uid());
+  for update using (
+    provider_id = auth.uid() 
+    and exists (
+      select 1 from public.profiles 
+      where id = auth.uid() and role = 'provider'
+    )
+  );
 
 create policy "providers delete own listings" on public.service_listings 
   for delete using (provider_id = auth.uid());

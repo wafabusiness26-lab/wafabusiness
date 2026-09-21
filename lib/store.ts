@@ -219,6 +219,41 @@ export class DataStore {
     return true;
   }
 
+  static async updateUserRole(userId: string, role: UserRole): Promise<boolean> {
+    const updatePayload: any = {
+      role,
+      verification_status: role === 'provider' ? 'en_attente_physique' : 'non_verifie',
+    };
+
+    if (isSupabaseConfigured()) {
+      const supabase = createClient();
+      if (supabase) {
+        const { error } = await supabase
+          .from('profiles')
+          .update(updatePayload)
+          .eq('id', userId);
+
+        if (error) {
+          console.error('Supabase updateUserRole error:', error.message);
+          throw error;
+        }
+
+        if (typeof window !== 'undefined') {
+          window.dispatchEvent(new CustomEvent('sm_data_change', { detail: { key: 'profiles' } }));
+        }
+        return true;
+      }
+    }
+
+    const profiles = getLocal<Profile[]>(STORAGE_KEYS.PROFILES, INITIAL_PROFILES);
+    const index = profiles.findIndex(p => p.id === userId);
+    if (index >= 0) {
+      profiles[index] = { ...profiles[index], ...updatePayload };
+      setLocal(STORAGE_KEYS.PROFILES, profiles);
+    }
+    return true;
+  }
+
   // --------------------------------------------------------------------------
   // ANNONCES DE SERVICES (BABYSITTING & SOUTIEN SCOLAIRE)
   // --------------------------------------------------------------------------
@@ -423,7 +458,10 @@ export class DataStore {
 
       if (error) {
         console.error('Supabase saveListing error:', error);
-        throw error;
+        if (error.code === '42501' || error.message?.includes('row-level security') || error.message?.includes('policy')) {
+          throw new Error("Accès refusé par la sécurité Supabase (RLS 42501) : Seuls les comptes avec le rôle 'provider' (Prestataire) sont autorisés à créer ou modifier une annonce. Votre compte possède actuellement le rôle 'client'. Activez d'abord votre profil prestataire pour pouvoir publier.");
+        }
+        throw new Error(error.message || "Impossible d'enregistrer l'annonce de service.");
       }
       return data as ServiceListing;
     }
@@ -440,6 +478,32 @@ export class DataStore {
     }
     setLocal(STORAGE_KEYS.LISTINGS, updated);
     return completeListing;
+  }
+
+  static async deleteListing(id: string): Promise<boolean> {
+    if (isSupabaseConfigured()) {
+      const supabase = createClient();
+      if (supabase) {
+        const { error } = await supabase
+          .from('service_listings')
+          .delete()
+          .eq('id', id);
+
+        if (error) {
+          console.error('Supabase deleteListing error:', error);
+          throw error;
+        }
+
+        if (typeof window !== 'undefined') {
+          window.dispatchEvent(new CustomEvent('sm_data_change', { detail: { key: 'service_listings' } }));
+        }
+        return true;
+      }
+    }
+
+    const listings = getLocal<ServiceListing[]>(STORAGE_KEYS.LISTINGS, INITIAL_LISTINGS);
+    setLocal(STORAGE_KEYS.LISTINGS, listings.filter(l => l.id !== id));
+    return true;
   }
 
   // --------------------------------------------------------------------------
