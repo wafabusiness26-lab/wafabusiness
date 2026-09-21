@@ -105,7 +105,11 @@ export class DataStore {
       avatar_url: profile.avatar_url ?? current?.avatar_url ?? null,
       bio: profile.bio ?? current?.bio ?? null,
       created_at: current?.created_at || new Date().toISOString(),
-      verification_status: profile.verification_status ?? current?.verification_status ?? (profile.role === 'provider' ? 'en_attente_physique' : 'non_verifie'),
+      verification_status: profile.verification_status 
+        ?? (profile.role === 'provider' && (!current?.verification_status || current?.verification_status === 'non_verifie')
+            ? 'en_attente_physique' 
+            : current?.verification_status) 
+        ?? (profile.role === 'provider' ? 'en_attente_physique' : 'non_verifie'),
       id_card_verified: profile.id_card_verified ?? current?.id_card_verified ?? false,
       birth_certificate_verified: profile.birth_certificate_verified ?? current?.birth_certificate_verified ?? false,
       family_record_verified: profile.family_record_verified ?? current?.family_record_verified ?? false,

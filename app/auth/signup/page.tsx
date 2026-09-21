@@ -1,18 +1,26 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useState, useEffect, Suspense } from 'react';
 import Link from 'next/link';
-import { useRouter } from 'next/navigation';
+import { useRouter, useSearchParams } from 'next/navigation';
 import { useAuth } from '@/lib/auth-context';
 import { UserRole } from '@/types';
 import { ALGER_COMMUNES, ADMIN_CONTACT } from '@/lib/constants';
 import { Logo } from '@/components/Logo';
 
-export default function SignupPage() {
+function SignupForm() {
   const router = useRouter();
+  const searchParams = useSearchParams();
+  const queryRole = searchParams.get('role');
   const { signup } = useAuth();
   
-  const [role, setRole] = useState<UserRole>('client');
+  const [role, setRole] = useState<UserRole>(queryRole === 'provider' ? 'provider' : 'client');
+
+  useEffect(() => {
+    if (queryRole === 'provider') {
+      setRole('provider');
+    }
+  }, [queryRole]);
   const [fullName, setFullName] = useState('');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
@@ -367,5 +375,21 @@ export default function SignupPage() {
 
       </div>
     </div>
+  );
+}
+
+export default function SignupPage() {
+  return (
+    <Suspense
+      fallback={
+        <div className="min-h-[85vh] bg-[#FAF8F5] flex items-center justify-center">
+          <span className="material-symbols-outlined text-3xl animate-spin text-primary">
+            progress_activity
+          </span>
+        </div>
+      }
+    >
+      <SignupForm />
+    </Suspense>
   );
 }

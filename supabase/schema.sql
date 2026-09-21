@@ -153,19 +153,28 @@ begin
   values (
     new.id,
     case 
-      when new.raw_user_meta_data->>'role' in ('client', 'provider') then new.raw_user_meta_data->>'role'
+      when lower(trim(coalesce(new.raw_user_meta_data->>'role', ''))) in ('client', 'provider') 
+        then lower(trim(new.raw_user_meta_data->>'role'))
       else 'client' -- Empêche l'auto-attribution du rôle admin lors du signup
     end,
     coalesce(new.raw_user_meta_data->>'full_name', 'Utilisateur Amana'),
     new.raw_user_meta_data->>'phone',
     coalesce(new.raw_user_meta_data->>'location', 'Alger Centre'),
     case 
-      when new.raw_user_meta_data->>'role' = 'provider' then 'en_attente_physique'
+      when lower(trim(coalesce(new.raw_user_meta_data->>'role', ''))) = 'provider' then 'en_attente_physique'
       else 'non_verifie'
     end
   )
   on conflict (id) do update set
-    full_name = excluded.full_name,
+    role = case 
+      when profiles.role = 'client' and lower(trim(coalesce(excluded.role, ''))) = 'provider' then 'provider'
+      else profiles.role
+    end,
+    verification_status = case 
+      when profiles.verification_status = 'non_verifie' and lower(trim(coalesce(excluded.role, ''))) = 'provider' then 'en_attente_physique'
+      else profiles.verification_status
+    end,
+    full_name = coalesce(excluded.full_name, profiles.full_name),
     phone = coalesce(excluded.phone, profiles.phone),
     location = coalesce(excluded.location, profiles.location);
   return new;
