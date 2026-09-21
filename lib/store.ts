@@ -779,6 +779,32 @@ export class DataStore {
     return false;
   }
 
+  static async deleteRequest(requestId: string): Promise<boolean> {
+    if (isSupabaseConfigured()) {
+      const supabase = createClient();
+      if (supabase) {
+        const { error } = await supabase
+          .from('requests')
+          .delete()
+          .eq('id', requestId);
+
+        if (error) {
+          console.error('Supabase deleteRequest error:', error);
+          throw error;
+        }
+
+        if (typeof window !== 'undefined') {
+          window.dispatchEvent(new CustomEvent('sm_data_change', { detail: { key: 'requests' } }));
+        }
+        return true;
+      }
+    }
+
+    const current = getLocal<ServiceRequest[]>(STORAGE_KEYS.REQUESTS, INITIAL_REQUESTS);
+    setLocal(STORAGE_KEYS.REQUESTS, current.filter(r => r.id !== requestId));
+    return true;
+  }
+
   // --------------------------------------------------------------------------
   // AVIS & NOTATION
   // --------------------------------------------------------------------------

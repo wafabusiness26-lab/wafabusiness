@@ -365,6 +365,23 @@ drop policy if exists "admin full access to requests" on public.requests;
 create policy "admin full access to requests" on public.requests 
   for all using (public.is_admin());
 
+drop policy if exists "clients delete own requests" on public.requests;
+create policy "clients delete own requests" on public.requests 
+  for delete using (
+    (auth.uid() is not null and client_id = auth.uid())
+    or public.is_admin()
+  );
+
+drop policy if exists "providers delete their requests" on public.requests;
+create policy "providers delete their requests" on public.requests 
+  for delete using (
+    exists (
+      select 1 from public.service_listings 
+      where id = listing_id and provider_id = auth.uid()
+    )
+    or public.is_admin()
+  );
+
 -- ------------------------------------------------------------------------------
 -- 4. POLITIQUES REVIEWS (Modération Delete-Only & Anti-Falsification)
 -- ------------------------------------------------------------------------------

@@ -5,24 +5,33 @@ import {
   Profile, 
   ServiceListing, 
   VerificationStatus,
-  UserRole
+  UserRole,
+  ServiceRequest,
+  RequestStatus
 } from '@/types';
 import { DataStore } from '@/lib/store';
 import { createClient, isSupabaseConfigured } from '@/lib/supabase/client';
-import { formatDate, formatPrice, getCategoryBadge } from '@/lib/utils';
+import { formatDate, formatPrice, getCategoryBadge, getStatusBadgeStyle } from '@/lib/utils';
 import { useAuth } from '@/lib/auth-context';
 import { VerificationBadge } from '@/components/VerificationBadge';
 import Link from 'next/link';
 
 export default function AdminDashboardPage() {
   const { role, isConfigured, loading: authLoading } = useAuth();
-  const [activeTab, setActiveTab] = useState<'candidates' | 'listings' | 'users'>('candidates');
+  const [activeTab, setActiveTab] = useState<'candidates' | 'requests' | 'listings' | 'users'>('candidates');
   
   // Candidates filter and search state
   const [candidateStatusFilter, setCandidateStatusFilter] = useState<string>('all');
   const [candidateSearch, setCandidateSearch] = useState<string>('');
   const [highlightId, setHighlightId] = useState<string | null>(null);
   const [updatingCandidateId, setUpdatingCandidateId] = useState<string | null>(null);
+
+  // Requests state
+  const [requests, setRequests] = useState<ServiceRequest[]>([]);
+  const [requestStatusFilter, setRequestStatusFilter] = useState<string>('all');
+  const [requestSearch, setRequestSearch] = useState<string>('');
+  const [updatingRequestId, setUpdatingRequestId] = useState<string | null>(null);
+  const [requestActionNotice, setRequestActionNotice] = useState<string | null>(null);
 
   // Users state
   const [profiles, setProfiles] = useState<Profile[]>([]);
@@ -38,12 +47,14 @@ export default function AdminDashboardPage() {
   const loadAllData = async () => {
     setLoading(true);
     try {
-      const [allProfiles, allListings] = await Promise.all([
+      const [allProfiles, allListings, allRequests] = await Promise.all([
         DataStore.getProfiles(),
         DataStore.getListings({ includeUnverified: true }),
+        DataStore.getRequests(),
       ]);
       setProfiles(allProfiles);
       setListings(allListings);
+      setRequests(allRequests);
     } catch (err) {
       console.error(err);
     } finally {
@@ -63,12 +74,12 @@ export default function AdminDashboardPage() {
         setActiveTab('candidates');
       }
       const targetTab = params.get('tab');
-      if (targetTab === 'candidates' || targetTab === 'listings' || targetTab === 'users') {
+      if (targetTab === 'candidates' || targetTab === 'requests' || targetTab === 'listings' || targetTab === 'users') {
         setActiveTab(targetTab);
       }
     }
 
-    // 1. Supabase Realtime Subscription (profiles, service_listings)
+    // 1. Supabase Realtime Subscription (profiles, service_listings, requests)
     let channel: any = null;
     if (isSupabaseConfigured()) {
       const supabase = createClient();
@@ -89,6 +100,15 @@ export default function AdminDashboardPage() {
             { event: '*', schema: 'public', table: 'service_listings' },
             (payload) => {
               setRealtimeNotice(`Annonce de service (${payload.eventType}) à ${new Date().toLocaleTimeString('fr-FR')}`);
+              loadAllData();
+              setTimeout(() => setRealtimeNotice(null), 5000);
+            }
+          )
+          .on(
+            'postgres_changes',
+            { event: '*', schema: 'public', table: 'requests' },
+            (payload) => {
+              setRealtimeNotice(`Demande de service mise à jour (${payload.eventType}) à ${new Date().toLocaleTimeString('fr-FR')}`);
               loadAllData();
               setTimeout(() => setRealtimeNotice(null), 5000);
             }
@@ -146,6 +166,37 @@ export default function AdminDashboardPage() {
     }
   };
 
+  const handleUpdateRequestStatus = async (requestId: string, newStatus: RequestStatus, adminNotes?: string) => {
+    setUpdatingRequestId(requestId);
+    try {
+      await DataStore.updateRequestStatus(requestId, newStatus, adminNotes);
+      setRequestActionNotice(`Statut de la demande mis à jour avec succès.`);
+      await loadAllData();
+      setTimeout(() => setRequestActionNotice(null), 4000);
+    } catch (e: any) {
+      alert("Erreur lors de la mise à jour de la demande : " + (e.message || e));
+    } finally {
+      setUpdatingRequestId(null);
+    }
+  };
+
+  const handleDeleteRequest = async (requestId: string) => {
+    if (!confirm("Confirmez-vous la suppression définitive de cette demande ? Elle sera retirée de tous les tableaux de bord (client, prestataire, coordinateur).")) {
+      return;
+    }
+    setUpdatingRequestId(requestId);
+    try {
+      await DataStore.deleteRequest(requestId);
+      setRequestActionNotice("Demande supprimée définitivement de la plateforme.");
+      await loadAllData();
+      setTimeout(() => setRequestActionNotice(null), 4000);
+    } catch (e: any) {
+      alert("Erreur lors de la suppression de la demande : " + (e.message || e));
+    } finally {
+      setUpdatingRequestId(null);
+    }
+  };
+
   // Provider Candidatures Breakdown
   const allProviderProfiles = profiles.filter(p => p.role === 'provider');
   const pendingCandidates = allProviderProfiles.filter(
@@ -184,6 +235,41 @@ export default function AdminDashboardPage() {
       if (!matchName && !matchPhone && !matchLoc && !matchCode) return false;
     }
 
+    return true;
+  });
+
+  // Requests Breakdown
+  const acceptedRequests = requests.filter(r => r.admin_notes === 'accepted_by_provider' || (r.status === 'in_progress' && r.admin_notes !== 'declined_by_provider'));
+  const newRequests = requests.filter(r => r.status === 'new');
+  const inProgressRequests = requests.filter(r => r.status === 'in_progress');
+  const completedRequests = requests.filter(r => r.status === 'completed');
+  const declinedRequests = requests.filter(r => r.status === 'cancelled' || r.admin_notes === 'declined_by_provider');
+
+  // Filtered requests according to status tab and search query
+  const filteredRequests = requests.filter((r) => {
+    if (requestStatusFilter === 'accepted') {
+      if (r.admin_notes !== 'accepted_by_provider' && r.status !== 'in_progress') return false;
+    } else if (requestStatusFilter === 'new') {
+      if (r.status !== 'new') return false;
+    } else if (requestStatusFilter === 'in_progress') {
+      if (r.status !== 'in_progress') return false;
+    } else if (requestStatusFilter === 'completed') {
+      if (r.status !== 'completed') return false;
+    } else if (requestStatusFilter === 'declined') {
+      if (r.status !== 'cancelled' && r.admin_notes !== 'declined_by_provider') return false;
+    }
+
+    if (requestSearch.trim()) {
+      const q = requestSearch.toLowerCase().trim();
+      const code = `tw-alg-${r.id.slice(-4)}`.toLowerCase();
+      const clientName = (r.client_name || r.client?.full_name || '').toLowerCase();
+      const providerName = (r.listing?.provider?.full_name || '').toLowerCase();
+      const phone = (r.client_phone || r.client?.phone || r.listing?.provider?.phone || '').toLowerCase();
+      const location = (r.address_details || r.listing?.location || '').toLowerCase();
+      if (!clientName.includes(q) && !providerName.includes(q) && !phone.includes(q) && !location.includes(q) && !code.includes(q)) {
+        return false;
+      }
+    }
     return true;
   });
 
@@ -269,7 +355,7 @@ export default function AdminDashboardPage() {
         )}
 
         {/* Métriques Clés Bento */}
-        <div className="grid grid-cols-1 sm:grid-cols-4 gap-4">
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
           <div 
             onClick={() => {
               setActiveTab('candidates');
@@ -295,19 +381,23 @@ export default function AdminDashboardPage() {
 
           <div 
             onClick={() => {
-              setActiveTab('candidates');
-              setCandidateStatusFilter('non_verifie');
+              setActiveTab('requests');
+              setRequestStatusFilter('all');
             }}
-            className="bg-surface-container-lowest rounded-2xl border border-[#ded7ca] p-5 shadow-xs cursor-pointer hover:border-primary/40 transition"
+            className={`bg-surface-container-lowest rounded-2xl border p-5 shadow-xs cursor-pointer transition ${
+              acceptedRequests.length > 0 ? 'border-emerald-400 bg-emerald-50/30 hover:bg-emerald-50/60' : 'border-[#ded7ca] hover:border-primary/40'
+            }`}
           >
             <span className="text-[11px] font-bold text-on-surface-variant uppercase tracking-wider block">
-              Non Examinés
+              Demandes des Familles
             </span>
-            <div className="font-serif text-3xl font-bold text-slate-700 mt-1 flex items-center justify-between">
-              <span>{unreviewedCandidates.length}</span>
-              <span className="material-symbols-outlined text-xl text-slate-400">pending</span>
+            <div className="font-serif text-3xl font-bold text-emerald-800 mt-1 flex items-center justify-between">
+              <span>{requests.length}</span>
+              <span className="material-symbols-outlined text-xl text-emerald-600">forum</span>
             </div>
-            <span className="text-[11px] text-on-surface-variant mt-1 block">Nouveaux dossiers inscrits</span>
+            <span className="text-[11px] text-emerald-800 font-semibold mt-1 block">
+              {acceptedRequests.length} acceptée(s) • {newRequests.length} nouvelle(s)
+            </span>
           </div>
 
           <div 
@@ -360,6 +450,33 @@ export default function AdminDashboardPage() {
                 activeTab === 'candidates' ? 'bg-white text-primary' : 'bg-amber-200 text-amber-900'
               }`}>
                 {pendingCandidates.length} en attente
+              </span>
+            )}
+          </button>
+
+          <button
+            type="button"
+            onClick={() => setActiveTab('requests')}
+            className={`px-5 py-2.5 rounded-2xl text-xs font-bold transition flex items-center gap-2 whitespace-nowrap cursor-pointer ${
+              activeTab === 'requests'
+                ? 'bg-primary text-white shadow-xs'
+                : 'bg-surface-container-lowest text-on-surface-variant hover:text-on-surface border border-[#ded7ca]'
+            }`}
+          >
+            <span className="material-symbols-outlined text-base">forum</span>
+            <span>Demandes des Familles ({requests.length})</span>
+            {acceptedRequests.length > 0 && (
+              <span className={`px-2 py-0.5 rounded-full text-[10px] font-extrabold ${
+                activeTab === 'requests' ? 'bg-white text-primary' : 'bg-emerald-100 text-emerald-900'
+              }`}>
+                {acceptedRequests.length} acceptée{acceptedRequests.length > 1 ? 's' : ''}
+              </span>
+            )}
+            {newRequests.length > 0 && (
+              <span className={`px-2 py-0.5 rounded-full text-[10px] font-extrabold ${
+                activeTab === 'requests' ? 'bg-amber-300 text-amber-950' : 'bg-amber-200 text-amber-900'
+              }`}>
+                {newRequests.length} nouvelle{newRequests.length > 1 ? 's' : ''}
               </span>
             )}
           </button>
@@ -659,6 +776,336 @@ export default function AdminDashboardPage() {
                           </Link>
                         </div>
                       </div>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* TAB: DEMANDES DES FAMILLES (SUPERVISION & COORDINATION) */}
+        {activeTab === 'requests' && (
+          <div className="space-y-6">
+            {/* Header & Quick Stats */}
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 bg-surface-container-lowest p-6 rounded-3xl border border-[#ded7ca]">
+              <div>
+                <h3 className="font-serif font-bold text-xl text-on-surface">
+                  Supervision des Demandes des Familles &amp; Missions
+                </h3>
+                <p className="text-xs sm:text-sm text-on-surface-variant mt-1">
+                  Suivez en direct les acceptations et refus des prestataires, coordonnez par téléphone avec les deux parties et gérez les statuts d'intervention.
+                </p>
+              </div>
+              <div className="flex items-center gap-2">
+                <span className="px-3.5 py-1.5 rounded-2xl bg-emerald-100 text-emerald-900 border border-emerald-300 text-xs font-bold flex items-center gap-1.5 shadow-xs">
+                  <span className="material-symbols-outlined text-sm text-emerald-700 material-symbols-fill">verified</span>
+                  <span>{acceptedRequests.length} mission(s) acceptée(s)</span>
+                </span>
+              </div>
+            </div>
+
+            {/* Action Notice Banner */}
+            {requestActionNotice && (
+              <div className="p-4 rounded-2xl bg-primary text-white text-xs font-semibold flex items-center justify-between shadow-xs animate-fadeIn">
+                <div className="flex items-center gap-2">
+                  <span className="material-symbols-outlined text-base">info</span>
+                  <span>{requestActionNotice}</span>
+                </div>
+              </div>
+            )}
+
+            {/* Status Filter Tabs & Search Bar */}
+            <div className="flex flex-col md:flex-row md:items-center justify-between gap-3 bg-surface-container-lowest p-4 rounded-3xl border border-[#ded7ca]">
+              {/* Filter Pills */}
+              <div className="flex items-center gap-1.5 overflow-x-auto pb-1 md:pb-0">
+                {[
+                  { key: 'all', label: `Toutes (${requests.length})` },
+                  { key: 'accepted', label: `Acceptées par prestataire (${acceptedRequests.length})` },
+                  { key: 'new', label: `Nouvelles (${newRequests.length})` },
+                  { key: 'in_progress', label: `En cours (${inProgressRequests.length})` },
+                  { key: 'completed', label: `Terminées (${completedRequests.length})` },
+                  { key: 'declined', label: `Déclinées / Annulées (${declinedRequests.length})` },
+                ].map((tab) => (
+                  <button
+                    key={tab.key}
+                    type="button"
+                    onClick={() => setRequestStatusFilter(tab.key)}
+                    className={`px-3.5 py-1.5 rounded-xl text-xs font-bold transition whitespace-nowrap cursor-pointer ${
+                      requestStatusFilter === tab.key
+                        ? 'bg-primary text-white shadow-xs'
+                        : 'bg-[#FAF8F5] text-on-surface-variant hover:text-on-surface border border-[#ded7ca]'
+                    }`}
+                  >
+                    {tab.label}
+                  </button>
+                ))}
+              </div>
+
+              {/* Search Bar */}
+              <div className="relative w-full md:w-72">
+                <span className="material-symbols-outlined absolute left-3 top-1/2 -translate-y-1/2 text-outline text-lg pointer-events-none">
+                  search
+                </span>
+                <input
+                  type="text"
+                  value={requestSearch}
+                  onChange={(e) => setRequestSearch(e.target.value)}
+                  placeholder="Famille, prestataire, téléphone, commune..."
+                  className="w-full pl-9 pr-3 py-2 bg-[#FAF8F5] border border-[#ded7ca] rounded-xl text-xs text-on-surface focus:outline-none focus:ring-1 focus:ring-primary focus:border-primary transition placeholder:text-outline"
+                />
+              </div>
+            </div>
+
+            {/* Requests List */}
+            {filteredRequests.length === 0 ? (
+              <div className="bg-surface-container-lowest rounded-3xl border border-[#ded7ca] p-12 text-center max-w-md mx-auto space-y-4 shadow-sm">
+                <div className="w-14 h-14 rounded-2xl bg-primary-fixed/40 text-primary flex items-center justify-center mx-auto">
+                  <span className="material-symbols-outlined text-2xl">forum</span>
+                </div>
+                <h3 className="font-serif text-lg font-bold text-on-surface">Aucune demande trouvée</h3>
+                <p className="text-xs text-on-surface-variant leading-relaxed">
+                  Aucune demande ne correspond à vos filtres de recherche.
+                </p>
+              </div>
+            ) : (
+              <div className="space-y-4">
+                {filteredRequests.map((req) => {
+                  const badge = getStatusBadgeStyle(req.status);
+                  const isAccepted = req.admin_notes === 'accepted_by_provider' || (req.status === 'in_progress' && req.admin_notes !== 'declined_by_provider');
+                  const isDeclined = req.status === 'cancelled' || req.admin_notes === 'declined_by_provider';
+                  const isNew = req.status === 'new';
+                  const clientName = req.client_name || req.client?.full_name || 'Famille';
+                  const clientPhone = req.client_phone || req.client?.phone || null;
+                  const providerName = req.listing?.provider?.full_name || 'Prestataire non assigné';
+                  const providerPhone = req.listing?.provider?.phone || null;
+                  const dossierCode = `TW-ALG-${req.id.slice(-4).toUpperCase()}`;
+
+                  return (
+                    <div
+                      key={req.id}
+                      className={`bg-surface-container-lowest rounded-3xl border p-6 shadow-sm space-y-5 transition ${
+                        isAccepted 
+                          ? 'border-emerald-300 bg-emerald-50/15 hover:border-emerald-500' 
+                          : isDeclined 
+                          ? 'border-rose-200 hover:border-rose-300' 
+                          : 'border-[#ded7ca] hover:border-primary/40'
+                      }`}
+                    >
+                      {/* Top Header Row */}
+                      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-[#ded7ca]/60 pb-3">
+                        <div className="flex items-center gap-2.5 flex-wrap">
+                          <span className={`px-3 py-1 rounded-full text-xs font-bold border ${badge.bg}`}>
+                            {badge.label}
+                          </span>
+                          <span className="text-xs font-bold text-[#7d562d] bg-[#fcf8ee] border border-[#D4A373]/60 px-2.5 py-0.5 rounded-full font-mono">
+                            Dossier {dossierCode}
+                          </span>
+                          <span className="text-xs text-on-surface-variant">
+                            Reçue le {formatDate(req.created_at)}
+                          </span>
+                        </div>
+
+                        {/* Status Change & Delete Actions */}
+                        <div className="flex items-center gap-2 flex-wrap">
+                          {isNew && (
+                            <button
+                              type="button"
+                              disabled={updatingRequestId === req.id}
+                              onClick={() => handleUpdateRequestStatus(req.id, 'in_progress')}
+                              className="px-3 py-1.5 bg-secondary hover:bg-secondary-600 text-white text-xs font-bold rounded-xl shadow-xs transition flex items-center gap-1 cursor-pointer disabled:opacity-50"
+                            >
+                              <span className="material-symbols-outlined text-sm">phone_in_talk</span>
+                              <span>Passer en coordination</span>
+                            </button>
+                          )}
+
+                          {req.status === 'in_progress' && (
+                            <button
+                              type="button"
+                              disabled={updatingRequestId === req.id}
+                              onClick={() => handleUpdateRequestStatus(req.id, 'completed')}
+                              className="px-3 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold rounded-xl shadow-xs transition flex items-center gap-1 cursor-pointer disabled:opacity-50"
+                            >
+                              <span className="material-symbols-outlined text-sm">verified</span>
+                              <span>Marquer terminée</span>
+                            </button>
+                          )}
+
+                          {req.status !== 'cancelled' && (
+                            <button
+                              type="button"
+                              disabled={updatingRequestId === req.id}
+                              onClick={() => {
+                                if (confirm(`Confirmez-vous l'annulation de cette demande ?`)) {
+                                  handleUpdateRequestStatus(req.id, 'cancelled');
+                                }
+                              }}
+                              className="px-2.5 py-1.5 bg-[#FAF8F5] hover:bg-rose-50 text-rose-700 border border-rose-200 text-xs font-semibold rounded-xl transition cursor-pointer disabled:opacity-50"
+                            >
+                              Annuler
+                            </button>
+                          )}
+
+                          {/* Delete from platform button */}
+                          <button
+                            type="button"
+                            disabled={updatingRequestId === req.id}
+                            onClick={() => handleDeleteRequest(req.id)}
+                            className="p-1.5 bg-rose-50 hover:bg-rose-100 text-rose-600 rounded-xl transition cursor-pointer disabled:opacity-50 border border-rose-200"
+                            title="Supprimer définitivement cette demande de tous les tableaux de bord"
+                          >
+                            <span className="material-symbols-outlined text-base">delete</span>
+                          </button>
+                        </div>
+                      </div>
+
+                      {/* SPECIFIC NOTIFICATION BANNER ACCORDING TO STATE */}
+                      {isAccepted && (
+                        <div className="p-4 rounded-2xl bg-gradient-to-r from-emerald-50 via-teal-50 to-emerald-50 border-2 border-emerald-400 text-emerald-950 space-y-1.5 shadow-xs">
+                          <div className="flex items-center gap-2 font-serif font-bold text-sm text-emerald-900">
+                            <span className="material-symbols-outlined text-emerald-600 text-xl material-symbols-fill">check_circle</span>
+                            <span>✓ Demande acceptée par le prestataire : {providerName} pour la famille {clientName}</span>
+                          </div>
+                          <p className="text-xs text-emerald-900 leading-relaxed">
+                            Le prestataire a validé sa disponibilité. Il est invité à appeler le client sous 24h. En tant que coordinateur, vous disposez des numéros directs des deux parties ci-dessous.
+                          </p>
+                        </div>
+                      )}
+
+                      {isDeclined && (
+                        <div className="p-4 rounded-2xl bg-rose-50 border-2 border-rose-200 text-rose-950 space-y-1.5 shadow-xs">
+                          <div className="flex items-center gap-2 font-serif font-bold text-sm text-rose-900">
+                            <span className="material-symbols-outlined text-rose-600 text-xl">cancel</span>
+                            <span>✕ Demande déclinée par le prestataire : {providerName} pour la famille {clientName}</span>
+                          </div>
+                          <p className="text-xs text-rose-900 leading-relaxed">
+                            Le prestataire a décliné ce créneau. Le client a été notifié sur son espace personnel.
+                          </p>
+                        </div>
+                      )}
+
+                      {isNew && (
+                        <div className="p-4 rounded-2xl bg-amber-50 border-2 border-amber-300 text-amber-950 space-y-1.5 shadow-xs">
+                          <div className="flex items-center gap-2 font-serif font-bold text-sm text-amber-900">
+                            <span className="material-symbols-outlined text-amber-600 text-xl">schedule</span>
+                            <span>Demande nouvelle en attente de réponse : {clientName} pour {providerName}</span>
+                          </div>
+                          <p className="text-xs text-amber-900 leading-relaxed">
+                            Réservation transmise au prestataire. Contactez-le si une confirmation urgente est requise.
+                          </p>
+                        </div>
+                      )}
+
+                      {/* Contact Cards: Client & Provider Phone Coordination */}
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        {/* Client Contact */}
+                        <div className="p-4 bg-[#FAF8F5] rounded-2xl border border-[#ded7ca] text-xs space-y-2">
+                          <span className="text-[10px] font-bold uppercase tracking-wider text-primary block">
+                            1. Contact Famille (Client)
+                          </span>
+                          <div className="flex items-center justify-between">
+                            <span className="font-serif font-bold text-sm text-on-surface">{clientName}</span>
+                            <span className="text-[10px] px-2 py-0.5 rounded-full bg-primary-fixed/40 text-primary font-bold">
+                              Famille
+                            </span>
+                          </div>
+                          <div className="flex items-center gap-2 flex-wrap pt-1">
+                            {clientPhone ? (
+                              <>
+                                <a
+                                  href={`tel:${clientPhone}`}
+                                  className="px-3 py-1.5 rounded-xl bg-primary text-white font-bold text-xs flex items-center gap-1 hover:bg-primary-600 transition shadow-xs"
+                                >
+                                  <span className="material-symbols-outlined text-sm">call</span>
+                                  <span>{clientPhone}</span>
+                                </a>
+                                <a
+                                  href={`https://wa.me/213${clientPhone.replace(/[^0-9]/g, '').replace(/^0/, '')}`}
+                                  target="_blank"
+                                  rel="noreferrer"
+                                  className="px-2.5 py-1.5 rounded-xl bg-emerald-100 text-emerald-900 hover:bg-emerald-200 border border-emerald-300 font-bold text-xs flex items-center gap-1 transition"
+                                >
+                                  <span className="material-symbols-outlined text-sm">chat</span>
+                                  <span>WhatsApp</span>
+                                </a>
+                              </>
+                            ) : (
+                              <span className="text-on-surface-variant italic">Téléphone non renseigné</span>
+                            )}
+                          </div>
+                          <p className="text-[11px] text-on-surface-variant">
+                            Commune : <strong>{req.address_details || req.client?.location || req.listing?.location || 'Alger'}</strong>
+                          </p>
+                        </div>
+
+                        {/* Provider Contact */}
+                        <div className="p-4 bg-[#FAF8F5] rounded-2xl border border-[#ded7ca] text-xs space-y-2">
+                          <span className="text-[10px] font-bold uppercase tracking-wider text-secondary block">
+                            2. Contact Prestataire Assigné
+                          </span>
+                          <div className="flex items-center justify-between">
+                            <span className="font-serif font-bold text-sm text-on-surface">{providerName}</span>
+                            <span className="text-[10px] px-2 py-0.5 rounded-full bg-secondary-fixed text-on-secondary-fixed font-bold">
+                              Prestataire
+                            </span>
+                          </div>
+                          <div className="flex items-center gap-2 flex-wrap pt-1">
+                            {providerPhone ? (
+                              <>
+                                <a
+                                  href={`tel:${providerPhone}`}
+                                  className="px-3 py-1.5 rounded-xl bg-secondary text-white font-bold text-xs flex items-center gap-1 hover:bg-secondary-600 transition shadow-xs"
+                                >
+                                  <span className="material-symbols-outlined text-sm">call</span>
+                                  <span>{providerPhone}</span>
+                                </a>
+                                <a
+                                  href={`https://wa.me/213${providerPhone.replace(/[^0-9]/g, '').replace(/^0/, '')}`}
+                                  target="_blank"
+                                  rel="noreferrer"
+                                  className="px-2.5 py-1.5 rounded-xl bg-emerald-100 text-emerald-900 hover:bg-emerald-200 border border-emerald-300 font-bold text-xs flex items-center gap-1 transition"
+                                >
+                                  <span className="material-symbols-outlined text-sm">chat</span>
+                                  <span>WhatsApp</span>
+                                </a>
+                              </>
+                            ) : (
+                              <span className="text-on-surface-variant italic">Téléphone non renseigné</span>
+                            )}
+                          </div>
+                          <p className="text-[11px] text-on-surface-variant">
+                            Service : <strong>{req.listing?.title || 'Prestation de garde'}</strong>
+                            {req.listing?.price ? ` • ${formatPrice(req.listing.price, req.listing.price_unit || 'séance')}` : ''}
+                          </p>
+                        </div>
+                      </div>
+
+                      {/* Mission Schedule & Note */}
+                      <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 text-xs bg-[#FAF8F5] p-3.5 rounded-2xl border border-[#ded7ca]">
+                        <div>
+                          <span className="text-[10px] text-on-surface-variant block uppercase font-bold">Date &amp; Horaire</span>
+                          <strong className="text-on-surface mt-0.5 block">{formatDate(req.requested_datetime)}</strong>
+                        </div>
+                        <div>
+                          <span className="text-[10px] text-on-surface-variant block uppercase font-bold">Enfants / Âge</span>
+                          <strong className="text-on-surface mt-0.5 block">
+                            {req.child_count || 1} enfant(s) {req.child_age_or_grade ? `(${req.child_age_or_grade})` : ''}
+                          </strong>
+                        </div>
+                        <div>
+                          <span className="text-[10px] text-on-surface-variant block uppercase font-bold">Règlement Espèces</span>
+                          <strong className="text-secondary mt-0.5 block">
+                            {req.listing?.price ? `${req.listing.price} DA en espèces` : 'Selon accord direct'}
+                          </strong>
+                        </div>
+                      </div>
+
+                      {req.note && (
+                        <div className="text-xs text-on-surface-variant bg-[#FAF8F5] p-3 rounded-xl border border-[#ded7ca]">
+                          <strong className="text-on-surface">Note de la famille :</strong> "{req.note}"
+                        </div>
+                      )}
                     </div>
                   );
                 })}

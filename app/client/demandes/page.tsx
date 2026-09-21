@@ -9,6 +9,7 @@ import { ReviewModal } from '@/components/ReviewModal';
 import { TimelineTracker } from '@/components/TimelineTracker';
 import { getStatusBadgeStyle, formatDate, formatPrice, getCategoryBadge } from '@/lib/utils';
 import { ADMIN_CONTACT } from '@/lib/constants';
+import { createClient, isSupabaseConfigured } from '@/lib/supabase/client';
 
 export default function ClientRequestsPage() {
   const { profile, user } = useAuth();
@@ -17,10 +18,11 @@ export default function ClientRequestsPage() {
   const [filterStatus, setFilterStatus] = useState<string>('all');
   const [selectedReviewRequest, setSelectedReviewRequest] = useState<ServiceRequest | null>(null);
 
+  const clientId = profile?.id || user?.id || 'usr_client_guest';
+
   const loadRequests = async () => {
     setLoading(true);
     try {
-      const clientId = profile?.id || user?.id || 'usr_client_guest';
       const data = await DataStore.getRequests({ role: 'client', userId: clientId });
       setRequests(data);
     } catch (e) {
@@ -33,13 +35,46 @@ export default function ClientRequestsPage() {
   useEffect(() => {
     loadRequests();
 
+    let channel: any = null;
+    if (isSupabaseConfigured()) {
+      const supabase = createClient();
+      if (supabase) {
+        channel = supabase
+          .channel(`client-requests-${clientId}`)
+          .on(
+            'postgres_changes',
+            { event: '*', schema: 'public', table: 'requests' },
+            () => {
+              loadRequests();
+            }
+          )
+          .subscribe();
+      }
+    }
+
     const handleDataChange = () => {
       loadRequests();
     };
 
     window.addEventListener('sm_data_change', handleDataChange);
-    return () => window.removeEventListener('sm_data_change', handleDataChange);
-  }, [profile?.id, user?.id]);
+    return () => {
+      window.removeEventListener('sm_data_change', handleDataChange);
+      if (channel) channel.unsubscribe();
+    };
+  }, [clientId]);
+
+  const handleDeleteRequest = async (requestId: string) => {
+    if (!confirm("Voulez-vous supprimer cette demande de votre tableau de bord ?")) {
+      return;
+    }
+    try {
+      await DataStore.deleteRequest(requestId);
+      await loadRequests();
+    } catch (e: any) {
+      console.error(e);
+      alert("Erreur lors de la suppression : " + (e.message || e));
+    }
+  };
 
   const filteredRequests = requests.filter((r) => {
     if (filterStatus === 'all') return true;
@@ -188,6 +223,73 @@ export default function ClientRequestsPage() {
 
                   {/* Timeline de la demande */}
                   <TimelineTracker status={req.status} />
+
+                  {/* NOTIFICATION SPECIFIQUE : SI LA DEMANDE A ETE ACCEPTEE */}
+                  {req.status === 'in_progress' && (
+                    <div className="p-4 sm:p-5 rounded-2xl bg-gradient-to-r from-emerald-50 via-teal-50 to-emerald-50 border-2 border-emerald-500 space-y-3 shadow-xs animate-fadeIn">
+                      <div className="flex items-center gap-2 text-emerald-900 font-serif font-bold text-sm">
+                        <span className="material-symbols-outlined text-emerald-600 text-2xl">check_circle</span>
+                        <span>Votre demande a été acceptée par {provider?.full_name || 'le prestataire'} !</span>
+                      </div>
+                      <p className="text-xs text-emerald-950 leading-relaxed">
+                        Veuillez attendre son appel téléphonique pour convenir des derniers détails de la mission. Si vous n'êtes pas contacté(e) dans les prochaines <strong>24 heures</strong>, vous êtes autorisé(e) à appeler directement le prestataire à ce numéro :
+                      </p>
+                      <div className="flex flex-wrap items-center gap-3 pt-1">
+                        {provider?.phone ? (
+                          <>
+                            <a
+                              href={`tel:${provider.phone}`}
+                              className="px-4 py-2 rounded-xl bg-emerald-700 hover:bg-emerald-800 text-white text-xs font-bold transition flex items-center gap-1.5 shadow-xs"
+                            >
+                              <span className="material-symbols-outlined text-base">call</span>
+                              <span>Appeler le prestataire : {provider.phone}</span>
+                            </a>
+                            <a
+                              href={`https://wa.me/213${provider.phone.replace(/[^0-9]/g, '').replace(/^0/, '')}`}
+                              target="_blank"
+                              rel="noreferrer"
+                              className="px-3.5 py-2 rounded-xl bg-emerald-100 hover:bg-emerald-200 text-emerald-900 text-xs font-bold transition flex items-center gap-1 border border-emerald-300"
+                            >
+                              <span className="material-symbols-outlined text-base">chat</span>
+                              <span>WhatsApp</span>
+                            </a>
+                          </>
+                        ) : (
+                          <span className="text-xs text-emerald-800 font-semibold italic">Coordonnées directes en cours d'attribution</span>
+                        )}
+                      </div>
+                    </div>
+                  )}
+
+                  {/* NOTIFICATION SPECIFIQUE : SI LA DEMANDE A ETE DECLINEE */}
+                  {(req.status === 'cancelled' || req.admin_notes === 'declined_by_provider') && (
+                    <div className="p-4 sm:p-5 rounded-2xl bg-rose-50 border-2 border-rose-300 space-y-3 shadow-xs animate-fadeIn">
+                      <div className="flex items-center gap-2 text-rose-900 font-serif font-bold text-sm">
+                        <span className="material-symbols-outlined text-rose-600 text-2xl">cancel</span>
+                        <span>Votre demande a été déclinée par le prestataire {provider?.full_name ? `(${provider.full_name})` : ''}</span>
+                      </div>
+                      <p className="text-xs text-rose-950 leading-relaxed">
+                        Le prestataire n'est malheureusement pas disponible pour ce créneau. Vous pouvez supprimer définitivement cette demande de votre tableau de bord et réserver un autre intervenant certifié sur Alger.
+                      </p>
+                      <div className="flex flex-wrap items-center gap-3 pt-1">
+                        <button
+                          type="button"
+                          onClick={() => handleDeleteRequest(req.id)}
+                          className="px-4 py-2 rounded-xl bg-rose-600 hover:bg-rose-700 text-white text-xs font-bold transition flex items-center gap-1.5 shadow-xs cursor-pointer"
+                        >
+                          <span className="material-symbols-outlined text-base">delete</span>
+                          <span>Compris • Supprimer de mon tableau de bord</span>
+                        </button>
+                        <Link
+                          href="/services"
+                          className="px-4 py-2 rounded-xl bg-white border border-rose-300 text-rose-800 hover:bg-rose-100 text-xs font-bold transition flex items-center gap-1"
+                        >
+                          <span className="material-symbols-outlined text-base">search</span>
+                          <span>Trouver un autre prestataire</span>
+                        </Link>
+                      </div>
+                    </div>
+                  )}
 
                   {/* Grille des détails */}
                   <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 text-xs bg-[#FAF8F5] p-4 rounded-2xl border border-[#ded7ca]">

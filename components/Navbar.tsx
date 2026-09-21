@@ -65,6 +65,8 @@ export const Navbar: React.FC = () => {
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [notifOpen, setNotifOpen] = useState(false);
   const [pendingProviders, setPendingProviders] = useState<any[]>([]);
+  const [adminRequests, setAdminRequests] = useState<any[]>([]);
+  const [notifTab, setNotifTab] = useState<'all' | 'candidates' | 'requests'>('all');
   const notifRef = React.useRef<HTMLDivElement>(null);
 
   const isActive = (path: string) => {
@@ -78,15 +80,16 @@ export const Navbar: React.FC = () => {
     setNotifOpen(false);
   }, [pathname]);
 
-  // Charger les notifications des prestataires en attente pour l'administrateur
+  // Charger les notifications des prestataires en attente et des demandes pour l'administrateur
   useEffect(() => {
     if (role !== 'admin') return;
 
     const loadNotifications = async () => {
       try {
-        const [providers, listings] = await Promise.all([
+        const [providers, listings, requests] = await Promise.all([
           DataStore.getProfiles('provider'),
           DataStore.getListings({ includeUnverified: true }),
+          DataStore.getRequests(),
         ]);
         const pending = providers
           .filter(p => p.verification_status !== 'verifie_en_main_propre' && p.verification_status !== 'suspendu')
@@ -95,6 +98,14 @@ export const Navbar: React.FC = () => {
             listing: listings.find(l => l.provider_id === p.id),
           }));
         setPendingProviders(pending);
+
+        // Demandes nécessitant attention : acceptées par prestataire, nouvelles, ou déclinées
+        const actionable = requests.filter(r => 
+          r.status === 'new' || 
+          r.admin_notes === 'accepted_by_provider' || 
+          r.admin_notes === 'declined_by_provider'
+        );
+        setAdminRequests(actionable);
       } catch (e) {
         console.error('Erreur chargement notifications admin:', e);
       }
@@ -117,6 +128,9 @@ export const Navbar: React.FC = () => {
             loadNotifications();
           })
           .on('postgres_changes', { event: '*', schema: 'public', table: 'service_listings' }, () => {
+            loadNotifications();
+          })
+          .on('postgres_changes', { event: '*', schema: 'public', table: 'requests' }, () => {
             loadNotifications();
           })
           .subscribe();
@@ -321,101 +335,196 @@ export const Navbar: React.FC = () => {
             </a>
 
             {/* Admin Notification Bell with Popover Dropdown */}
-            {role === 'admin' && (
-              <div className="relative" ref={notifRef}>
-                <button
-                  type="button"
-                  onClick={() => setNotifOpen(!notifOpen)}
-                  aria-label="Notifications candidatures prestataires"
-                  title="Nouvelles candidatures & annonces"
-                  className={`relative p-2 rounded-full transition-all duration-150 flex items-center justify-center cursor-pointer ${
-                    notifOpen
-                      ? 'bg-primary text-white shadow-xs'
-                      : 'bg-surface-container-low hover:bg-surface-container text-on-surface border border-[#ded7ca]'
-                  }`}
-                >
-                  <span className="material-symbols-outlined text-[20px] sm:text-[22px]">
-                    notifications
-                  </span>
-                  {pendingProviders.length > 0 && (
-                    <span className="absolute -top-1 -right-1 flex h-4 w-4 items-center justify-center rounded-full bg-red-600 text-[10px] font-bold text-white ring-2 ring-white animate-pulse">
-                      {pendingProviders.length}
+            {role === 'admin' && (() => {
+              const totalNotifs = pendingProviders.length + adminRequests.length;
+              return (
+                <div className="relative" ref={notifRef}>
+                  <button
+                    type="button"
+                    onClick={() => setNotifOpen(!notifOpen)}
+                    aria-label="Notifications candidatures et demandes"
+                    title="Nouvelles candidatures & demandes des familles"
+                    className={`relative p-2 rounded-full transition-all duration-150 flex items-center justify-center cursor-pointer ${
+                      notifOpen
+                        ? 'bg-primary text-white shadow-xs'
+                        : 'bg-surface-container-low hover:bg-surface-container text-on-surface border border-[#ded7ca]'
+                    }`}
+                  >
+                    <span className="material-symbols-outlined text-[20px] sm:text-[22px]">
+                      notifications
                     </span>
-                  )}
-                </button>
-
-                {/* Dropdown Popover */}
-                {notifOpen && (
-                  <div className="absolute right-0 mt-2 w-80 sm:w-96 bg-[#FAF8F5] rounded-3xl border border-[#ded7ca] shadow-2xl z-50 overflow-hidden">
-                    {/* Header */}
-                    <div className="p-4 bg-[#17222d] text-white flex items-center justify-between">
-                      <div className="flex items-center gap-2">
-                        <span className="material-symbols-outlined text-amber-400 text-lg">notifications_active</span>
-                        <h4 className="font-serif font-bold text-sm">Candidatures Prestataires</h4>
-                      </div>
-                      <span className="px-2 py-0.5 rounded-full text-[10px] font-extrabold bg-amber-400/20 text-amber-200 border border-amber-400/30">
-                        {pendingProviders.length} en attente
+                    {totalNotifs > 0 && (
+                      <span className="absolute -top-1 -right-1 flex h-4 w-4 items-center justify-center rounded-full bg-red-600 text-[10px] font-bold text-white ring-2 ring-white animate-pulse">
+                        {totalNotifs}
                       </span>
-                    </div>
+                    )}
+                  </button>
 
-                    {/* Notification List */}
-                    <div className="max-h-80 overflow-y-auto divide-y divide-[#ded7ca]/60">
-                      {pendingProviders.length === 0 ? (
-                        <div className="p-6 text-center text-xs text-on-surface-variant space-y-1">
-                          <span className="material-symbols-outlined text-3xl text-emerald-600 block mb-1">check_circle</span>
-                          <p className="font-semibold text-on-surface">Aucune candidature en attente</p>
-                          <p className="text-[11px]">Toutes les candidatures ont été traitées.</p>
+                  {/* Dropdown Popover */}
+                  {notifOpen && (
+                    <div className="absolute right-0 mt-2 w-80 sm:w-96 bg-[#FAF8F5] rounded-3xl border border-[#ded7ca] shadow-2xl z-50 overflow-hidden">
+                      {/* Header */}
+                      <div className="p-4 bg-[#17222d] text-white flex items-center justify-between">
+                        <div className="flex items-center gap-2">
+                          <span className="material-symbols-outlined text-amber-400 text-lg animate-pulse">notifications_active</span>
+                          <h4 className="font-serif font-bold text-sm">Centre de Notifications</h4>
                         </div>
-                      ) : (
-                        pendingProviders.map((prov) => (
-                          <Link
-                            key={prov.id}
-                            href={`/admin?id=${prov.id}`}
-                            onClick={() => setNotifOpen(false)}
-                            className="block p-3.5 hover:bg-white/80 transition group"
-                          >
-                            <div className="flex items-start justify-between gap-2">
-                              <div className="flex items-center gap-2">
-                                <div className="w-8 h-8 rounded-full bg-primary-container text-white font-bold text-xs flex items-center justify-center shrink-0">
-                                  {prov.full_name?.charAt(0) || 'P'}
-                                </div>
-                                <div className="min-w-0">
-                                  <span className="font-bold text-xs text-on-surface group-hover:text-primary transition block truncate">
-                                    {prov.full_name}
-                                  </span>
-                                  <span className="text-[10px] text-on-surface-variant block truncate">
-                                    {prov.location || 'Wilaya d\'Alger'} • {prov.phone || 'Tél non renseigné'}
-                                  </span>
-                                </div>
-                              </div>
-                              <VerificationBadge status={prov.verification_status || 'en_attente_physique'} size="sm" />
-                            </div>
+                        <span className="px-2 py-0.5 rounded-full text-[10px] font-extrabold bg-amber-400/20 text-amber-200 border border-amber-400/30">
+                          {totalNotifs} alerte{totalNotifs > 1 ? 's' : ''}
+                        </span>
+                      </div>
 
-                            {prov.listing && (
-                              <div className="mt-2 pl-10 text-[11px] text-on-surface-variant">
-                                <span className="font-semibold text-secondary">Annonce :</span> {prov.listing.title} ({prov.listing.price} DA)
-                              </div>
-                            )}
-                          </Link>
-                        ))
-                      )}
-                    </div>
+                      {/* Filter Tabs between Requests & Candidatures */}
+                      <div className="flex border-b border-[#ded7ca] bg-[#f8f5ee] text-xs font-bold">
+                        <button
+                          type="button"
+                          onClick={() => setNotifTab('all')}
+                          className={`flex-1 py-2 text-center transition border-b-2 cursor-pointer ${
+                            notifTab === 'all' ? 'border-primary text-primary bg-white' : 'border-transparent text-on-surface-variant hover:text-on-surface'
+                          }`}
+                        >
+                          Toutes ({totalNotifs})
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => setNotifTab('requests')}
+                          className={`flex-1 py-2 text-center transition border-b-2 cursor-pointer ${
+                            notifTab === 'requests' ? 'border-primary text-primary bg-white' : 'border-transparent text-on-surface-variant hover:text-on-surface'
+                          }`}
+                        >
+                          Demandes ({adminRequests.length})
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => setNotifTab('candidates')}
+                          className={`flex-1 py-2 text-center transition border-b-2 cursor-pointer ${
+                            notifTab === 'candidates' ? 'border-primary text-primary bg-white' : 'border-transparent text-on-surface-variant hover:text-on-surface'
+                          }`}
+                        >
+                          Candidats ({pendingProviders.length})
+                        </button>
+                      </div>
 
-                    {/* Footer Button */}
-                    <div className="p-3 bg-[#f3efe6] border-t border-[#ded7ca] text-center">
-                      <Link
-                        href="/admin"
-                        onClick={() => setNotifOpen(false)}
-                        className="w-full inline-flex items-center justify-center gap-1.5 text-xs font-bold text-primary hover:text-primary-600 py-1"
-                      >
-                        <span>Ouvrir le Panneau de Contrôle</span>
-                        <span className="material-symbols-outlined text-sm">arrow_forward</span>
-                      </Link>
+                      {/* Notification List */}
+                      <div className="max-h-80 overflow-y-auto divide-y divide-[#ded7ca]/60">
+                        {totalNotifs === 0 ? (
+                          <div className="p-6 text-center text-xs text-on-surface-variant space-y-1">
+                            <span className="material-symbols-outlined text-3xl text-emerald-600 block mb-1">check_circle</span>
+                            <p className="font-semibold text-on-surface">Aucune notification en attente</p>
+                            <p className="text-[11px]">Toutes les demandes et candidatures ont été traitées.</p>
+                          </div>
+                        ) : (
+                          <>
+                            {/* 1. Request Alerts */}
+                            {(notifTab === 'all' || notifTab === 'requests') && adminRequests.map((req) => {
+                              const isAccepted = req.admin_notes === 'accepted_by_provider' || (req.status === 'in_progress' && req.admin_notes !== 'declined_by_provider');
+                              const isDeclined = req.status === 'cancelled' || req.admin_notes === 'declined_by_provider';
+                              const clientName = req.client_name || req.client?.full_name || 'Famille';
+                              const providerName = req.listing?.provider?.full_name || 'Prestataire';
+                              const dossierCode = `TW-ALG-${req.id.slice(-4).toUpperCase()}`;
+
+                              return (
+                                <Link
+                                  key={`req-${req.id}`}
+                                  href={`/admin?tab=requests&id=${req.id}`}
+                                  onClick={() => setNotifOpen(false)}
+                                  className="block p-3.5 hover:bg-white/90 transition group"
+                                >
+                                  <div className="flex items-start gap-2.5">
+                                    <div className={`w-8 h-8 rounded-full flex items-center justify-center shrink-0 ${
+                                      isAccepted 
+                                        ? 'bg-emerald-100 text-emerald-800' 
+                                        : isDeclined 
+                                        ? 'bg-rose-100 text-rose-800' 
+                                        : 'bg-amber-100 text-amber-800'
+                                    }`}>
+                                      <span className="material-symbols-outlined text-base">
+                                        {isAccepted ? 'check_circle' : isDeclined ? 'cancel' : 'schedule'}
+                                      </span>
+                                    </div>
+                                    <div className="min-w-0 flex-1">
+                                      <div className="flex items-center justify-between gap-1">
+                                        <span className={`text-[10px] font-bold uppercase tracking-wider px-1.5 py-0.5 rounded ${
+                                          isAccepted 
+                                            ? 'bg-emerald-50 text-emerald-800 border border-emerald-200' 
+                                            : isDeclined 
+                                            ? 'bg-rose-50 text-rose-800 border border-rose-200' 
+                                            : 'bg-amber-50 text-amber-900 border border-amber-200'
+                                        }`}>
+                                          {isAccepted ? 'Demande Acceptée' : isDeclined ? 'Demande Déclinée' : 'Nouvelle Réservation'}
+                                        </span>
+                                        <span className="text-[10px] text-outline font-mono">
+                                          {dossierCode}
+                                        </span>
+                                      </div>
+                                      <p className="font-bold text-xs text-on-surface group-hover:text-primary transition mt-1 truncate">
+                                        {isAccepted 
+                                          ? `✓ ${providerName} a accepté ${clientName}`
+                                          : isDeclined 
+                                          ? `✕ ${providerName} a décliné ${clientName}`
+                                          : `${clientName} a réservé ${providerName}`}
+                                      </p>
+                                      <p className="text-[11px] text-on-surface-variant truncate">
+                                        {req.address_details || req.listing?.location || 'Alger'} • {req.listing?.title || 'Prestation'}
+                                      </p>
+                                    </div>
+                                  </div>
+                                </Link>
+                              );
+                            })}
+
+                            {/* 2. Candidate Alerts */}
+                            {(notifTab === 'all' || notifTab === 'candidates') && pendingProviders.map((prov) => (
+                              <Link
+                                key={`prov-${prov.id}`}
+                                href={`/admin?tab=candidates&id=${prov.id}`}
+                                onClick={() => setNotifOpen(false)}
+                                className="block p-3.5 hover:bg-white/80 transition group"
+                              >
+                                <div className="flex items-start justify-between gap-2">
+                                  <div className="flex items-center gap-2">
+                                    <div className="w-8 h-8 rounded-full bg-primary-container text-white font-bold text-xs flex items-center justify-center shrink-0">
+                                      {prov.full_name?.charAt(0) || 'P'}
+                                    </div>
+                                    <div className="min-w-0">
+                                      <span className="font-bold text-xs text-on-surface group-hover:text-primary transition block truncate">
+                                        {prov.full_name}
+                                      </span>
+                                      <span className="text-[10px] text-on-surface-variant block truncate">
+                                        {prov.location || 'Wilaya d\'Alger'} • {prov.phone || 'Tél non renseigné'}
+                                      </span>
+                                    </div>
+                                  </div>
+                                  <VerificationBadge status={prov.verification_status || 'en_attente_physique'} size="sm" />
+                                </div>
+
+                                {prov.listing && (
+                                  <div className="mt-2 pl-10 text-[11px] text-on-surface-variant">
+                                    <span className="font-semibold text-secondary">Annonce :</span> {prov.listing.title} ({prov.listing.price} DA)
+                                  </div>
+                                )}
+                              </Link>
+                            ))}
+                          </>
+                        )}
+                      </div>
+
+                      {/* Footer Button */}
+                      <div className="p-3 bg-[#f3efe6] border-t border-[#ded7ca] text-center">
+                        <Link
+                          href="/admin"
+                          onClick={() => setNotifOpen(false)}
+                          className="w-full inline-flex items-center justify-center gap-1.5 text-xs font-bold text-primary hover:text-primary-600 py-1"
+                        >
+                          <span>Ouvrir le Panneau de Contrôle</span>
+                          <span className="material-symbols-outlined text-sm">arrow_forward</span>
+                        </Link>
+                      </div>
                     </div>
-                  </div>
-                )}
-              </div>
-            )}
+                  )}
+                </div>
+              );
+            })()}
 
             {/* User Account / Profile */}
             {profile ? (

@@ -19,10 +19,6 @@ export default function ProviderDashboardPage() {
   const [reviews, setReviews] = useState<Review[]>([]);
   const [loading, setLoading] = useState(true);
 
-  // Request filter & action states
-  const [requestFilter, setRequestFilter] = useState<string>('all');
-  const [updatingRequestId, setUpdatingRequestId] = useState<string | null>(null);
-  const [actionNotice, setActionNotice] = useState<string | null>(null);
 
   const loadData = async () => {
     setLoading(true);
@@ -74,16 +70,73 @@ export default function ProviderDashboardPage() {
     };
   }, [providerId]);
 
+  // Request filter & action states
+  const [requestFilter, setRequestFilter] = useState<string>('all');
+  const [updatingRequestId, setUpdatingRequestId] = useState<string | null>(null);
+  const [actionNotice, setActionNotice] = useState<string | null>(null);
+  const [acceptedModalData, setAcceptedModalData] = useState<{ clientName: string; clientPhone?: string | null } | null>(null);
+
+  const handleAcceptRequest = async (req: ServiceRequest) => {
+    const clientName = req.client_name || req.client?.full_name || 'la famille';
+    const clientPhone = req.client_phone || req.client?.phone || null;
+    setUpdatingRequestId(req.id);
+    try {
+      await DataStore.updateRequestStatus(req.id, 'in_progress', 'accepted_by_provider');
+      setAcceptedModalData({ clientName, clientPhone });
+      await loadData();
+    } catch (err: any) {
+      console.error(err);
+      alert("Erreur lors de l'acceptation : " + (err.message || err));
+    } finally {
+      setUpdatingRequestId(null);
+    }
+  };
+
+  const handleDeclineRequest = async (req: ServiceRequest) => {
+    const clientName = req.client_name || req.client?.full_name || 'la famille';
+    if (!confirm(`Confirmez-vous vouloir décliner la demande de ${clientName} ? Le client recevra un message lui indiquant que sa demande a été déclinée.`)) {
+      return;
+    }
+    setUpdatingRequestId(req.id);
+    try {
+      await DataStore.updateRequestStatus(req.id, 'cancelled', 'declined_by_provider');
+      setActionNotice(`La demande de ${clientName} a été déclinée. Le client recevra un message explicatif sur son tableau de bord.`);
+      await loadData();
+      setTimeout(() => setActionNotice(null), 6000);
+    } catch (err: any) {
+      console.error(err);
+      alert("Erreur lors du refus : " + (err.message || err));
+    } finally {
+      setUpdatingRequestId(null);
+    }
+  };
+
+  const handleDeleteRequest = async (requestId: string) => {
+    if (!confirm("Voulez-vous supprimer définitivement cette demande de votre tableau de bord ?")) {
+      return;
+    }
+    setUpdatingRequestId(requestId);
+    try {
+      await DataStore.deleteRequest(requestId);
+      setActionNotice("La demande a été supprimée de votre historique.");
+      await loadData();
+      setTimeout(() => setActionNotice(null), 4000);
+    } catch (err: any) {
+      console.error(err);
+      alert("Erreur lors de la suppression : " + (err.message || err));
+    } finally {
+      setUpdatingRequestId(null);
+    }
+  };
+
   const handleUpdateRequestStatus = async (requestId: string, newStatus: RequestStatus) => {
     setUpdatingRequestId(requestId);
     try {
       await DataStore.updateRequestStatus(requestId, newStatus);
-      if (newStatus === 'in_progress') {
-        setActionNotice("Mission acceptée ! Vous pouvez dès à présent appeler la famille pour confirmer l'horaire et les détails.");
-      } else if (newStatus === 'completed') {
+      if (newStatus === 'completed') {
         setActionNotice("Félicitations ! Mission marquée comme terminée. La rémunération en espèces a été perçue.");
       } else if (newStatus === 'cancelled') {
-        setActionNotice("La demande a été déclinée.");
+        setActionNotice("La demande a été déclinée / annulée.");
       }
       await loadData();
       setTimeout(() => setActionNotice(null), 6000);
@@ -440,7 +493,7 @@ export default function ProviderDashboardPage() {
                             <button
                               type="button"
                               disabled={isUpdating}
-                              onClick={() => handleUpdateRequestStatus(req.id, 'in_progress')}
+                              onClick={() => handleAcceptRequest(req)}
                               className="px-4 py-2 rounded-xl bg-secondary hover:bg-secondary-600 text-white text-xs font-bold transition flex items-center gap-1 shadow-xs cursor-pointer disabled:opacity-50"
                               title="Confirmer la disponibilité et prendre contact avec la famille"
                             >
@@ -450,11 +503,7 @@ export default function ProviderDashboardPage() {
                             <button
                               type="button"
                               disabled={isUpdating}
-                              onClick={() => {
-                                if (confirm("Voulez-vous décliner cette demande de garde ?")) {
-                                  handleUpdateRequestStatus(req.id, 'cancelled');
-                                }
-                              }}
+                              onClick={() => handleDeclineRequest(req)}
                               className="px-3.5 py-2 rounded-xl bg-surface-container border border-[#ded7ca] text-on-surface-variant hover:text-error text-xs font-bold transition cursor-pointer disabled:opacity-50"
                               title="Décliner la mission"
                             >
@@ -494,6 +543,22 @@ export default function ProviderDashboardPage() {
                           <div className="flex items-center gap-1 text-xs text-emerald-700 font-bold">
                             <span className="material-symbols-outlined text-sm">done_all</span>
                             <span>Mission accomplie • Espèces perçues</span>
+                          </div>
+                        )}
+
+                        {req.status === 'cancelled' && (
+                          <div className="flex items-center gap-2">
+                            <span className="text-xs text-rose-700 font-semibold italic">Demande déclinée</span>
+                            <button
+                              type="button"
+                              disabled={isUpdating}
+                              onClick={() => handleDeleteRequest(req.id)}
+                              className="px-2.5 py-1 rounded-lg bg-rose-50 text-rose-700 hover:bg-rose-100 text-xs font-bold transition flex items-center gap-1 cursor-pointer"
+                              title="Supprimer définitivement de mon tableau"
+                            >
+                              <span className="material-symbols-outlined text-sm">delete</span>
+                              <span>Supprimer</span>
+                            </button>
                           </div>
                         )}
                       </div>
@@ -561,6 +626,65 @@ export default function ProviderDashboardPage() {
           title="Ligne directe du coordinateur pour les prestataires"
           subtitle="Une question sur une mission ou votre visite de contrôle physique ? Contactez-nous à tout moment."
         />
+
+        {/* MODAL / POPUP APRES ACCEPTATION PAR LE PRESTATAIRE */}
+        {acceptedModalData && (
+          <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-xs flex items-center justify-center p-4">
+            <div className="bg-[#FAF8F5] rounded-3xl border-2 border-emerald-500 p-6 sm:p-8 max-w-lg w-full shadow-2xl space-y-5 animate-in fade-in zoom-in duration-200">
+              <div className="w-16 h-16 rounded-3xl bg-emerald-100 text-emerald-800 flex items-center justify-center mx-auto shadow-xs">
+                <span className="material-symbols-outlined text-4xl text-emerald-600">check_circle</span>
+              </div>
+              
+              <div className="text-center space-y-2">
+                <h3 className="font-serif text-xl sm:text-2xl font-bold text-on-surface">
+                  Merci d'avoir accepté la demande !
+                </h3>
+                <p className="text-xs sm:text-sm text-on-surface-variant leading-relaxed">
+                  Nous vous recommandons d'appeler le client (<strong className="text-on-surface">{acceptedModalData.clientName}</strong>) pour convenir de tous les détails dès maintenant et au plus tard dans les prochaines <strong>24 heures</strong>.
+                </p>
+              </div>
+
+              {acceptedModalData.clientPhone && (
+                <div className="p-4 rounded-2xl bg-white border border-[#ded7ca] text-center space-y-2">
+                  <span className="text-[11px] uppercase font-bold text-on-surface-variant block">
+                    Numéro du client à contacter :
+                  </span>
+                  <div className="font-mono text-xl font-bold text-primary">
+                    {acceptedModalData.clientPhone}
+                  </div>
+                  <div className="flex items-center justify-center gap-2 pt-1">
+                    <a
+                      href={`tel:${acceptedModalData.clientPhone}`}
+                      className="px-4 py-2 rounded-xl bg-primary hover:bg-primary-600 text-white text-xs font-bold transition flex items-center gap-1.5 shadow-xs"
+                    >
+                      <span className="material-symbols-outlined text-base">call</span>
+                      <span>Appeler maintenant</span>
+                    </a>
+                    <a
+                      href={`https://wa.me/213${acceptedModalData.clientPhone.replace(/[^0-9]/g, '').replace(/^0/, '')}`}
+                      target="_blank"
+                      rel="noreferrer"
+                      className="px-4 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold transition flex items-center gap-1.5 shadow-xs"
+                    >
+                      <span className="material-symbols-outlined text-base">chat</span>
+                      <span>WhatsApp</span>
+                    </a>
+                  </div>
+                </div>
+              )}
+
+              <div className="pt-2">
+                <button
+                  type="button"
+                  onClick={() => setAcceptedModalData(null)}
+                  className="w-full py-3 rounded-2xl bg-surface-container border border-[#ded7ca] text-on-surface hover:bg-[#ede8df] text-xs font-bold transition cursor-pointer"
+                >
+                  J'ai compris • Fermer
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
 
       </div>
     </div>
