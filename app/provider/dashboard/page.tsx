@@ -640,7 +640,7 @@ export default function ProviderDashboardPage() {
                   Merci d'avoir accepté la demande !
                 </h3>
                 <p className="text-xs sm:text-sm text-on-surface-variant leading-relaxed">
-                  Nous vous recommandons d'appeler le client (<strong className="text-on-surface">{acceptedModalData.clientName}</strong>) pour convenir de tous les détails dès maintenant et au plus tard dans les prochaines <strong>24 heures</strong>.
+                  Merci d'avoir accepté la demande ! Vous devez appeler le client (<strong className="text-on-surface">{acceptedModalData.clientName}</strong>) pour caler tous les détails de la mission dès maintenant et au plus tard dans les prochaines <strong>24 heures</strong>.
                 </p>
               </div>
 

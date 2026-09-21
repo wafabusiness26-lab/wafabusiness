@@ -232,7 +232,7 @@ export default function ClientRequestsPage() {
                         <span>Votre demande a été acceptée par {provider?.full_name || 'le prestataire'} !</span>
                       </div>
                       <p className="text-xs text-emerald-950 leading-relaxed">
-                        Veuillez attendre son appel téléphonique pour convenir des derniers détails de la mission. Si vous n'êtes pas contacté(e) dans les prochaines <strong>24 heures</strong>, vous êtes autorisé(e) à appeler directement le prestataire à ce numéro :
+                        Votre demande a été acceptée ! Veuillez attendre son appel téléphonique. Si vous n'êtes pas contacté(e) dans les prochaines <strong>24 heures</strong>, vous êtes autorisé(e) à appeler directement le prestataire à ce numéro :
                       </p>
                       <div className="flex flex-wrap items-center gap-3 pt-1">
                         {provider?.phone ? (
@@ -269,7 +269,7 @@ export default function ClientRequestsPage() {
                         <span>Votre demande a été déclinée par le prestataire {provider?.full_name ? `(${provider.full_name})` : ''}</span>
                       </div>
                       <p className="text-xs text-rose-950 leading-relaxed">
-                        Le prestataire n'est malheureusement pas disponible pour ce créneau. Vous pouvez supprimer définitivement cette demande de votre tableau de bord et réserver un autre intervenant certifié sur Alger.
+                        Votre demande a été déclinée par le prestataire. Le prestataire n'est malheureusement pas disponible pour ce créneau. Vous pouvez supprimer définitivement cette demande de tous les tableaux de bord et réserver un autre intervenant certifié sur Alger.
                       </p>
                       <div className="flex flex-wrap items-center gap-3 pt-1">
                         <button
@@ -278,7 +278,7 @@ export default function ClientRequestsPage() {
                           className="px-4 py-2 rounded-xl bg-rose-600 hover:bg-rose-700 text-white text-xs font-bold transition flex items-center gap-1.5 shadow-xs cursor-pointer"
                         >
                           <span className="material-symbols-outlined text-base">delete</span>
-                          <span>Compris • Supprimer de mon tableau de bord</span>
+                          <span>Compris • Supprimer la demande de tous les tableaux de bord</span>
                         </button>
                         <Link
                           href="/services"

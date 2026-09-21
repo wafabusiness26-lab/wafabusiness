@@ -24,6 +24,38 @@ const STORAGE_KEYS = {
   REVIEWS: 'amana_reviews_v4',
 };
 
+const OVERRIDE_KEYS = {
+  REQUEST_OVERRIDES: 'amana_request_overrides_v1',
+  DELETED_REQUEST_IDS: 'amana_deleted_request_ids_v1',
+};
+
+function getRequestOverrides(): Record<string, { status: RequestStatus; admin_notes?: string }> {
+  return getLocal<Record<string, { status: RequestStatus; admin_notes?: string }>>(OVERRIDE_KEYS.REQUEST_OVERRIDES, {});
+}
+
+function setRequestOverride(id: string, override: { status: RequestStatus; admin_notes?: string }): void {
+  const current = getRequestOverrides();
+  current[id] = override;
+  setLocal(OVERRIDE_KEYS.REQUEST_OVERRIDES, current);
+}
+
+function getDeletedRequestIds(): string[] {
+  return getLocal<string[]>(OVERRIDE_KEYS.DELETED_REQUEST_IDS, []);
+}
+
+function markRequestDeleted(id: string): void {
+  const deleted = getDeletedRequestIds();
+  if (!deleted.includes(id)) {
+    deleted.push(id);
+    setLocal(OVERRIDE_KEYS.DELETED_REQUEST_IDS, deleted);
+  }
+  const currentOverrides = getRequestOverrides();
+  if (currentOverrides[id]) {
+    delete currentOverrides[id];
+    setLocal(OVERRIDE_KEYS.REQUEST_OVERRIDES, currentOverrides);
+  }
+}
+
 // Nettoyage automatique de tout ancien cache obsolète de test
 if (typeof window !== 'undefined') {
   try {
@@ -52,6 +84,23 @@ function setLocal<T>(key: string, value: T): void {
   } catch (e) {
     console.error('Erreur écriture localStorage', e);
   }
+}
+
+function applyLocalOverridesAndDeletions(list: ServiceRequest[]): ServiceRequest[] {
+  const deletedIds = getDeletedRequestIds();
+  const overrides = getRequestOverrides();
+  return list
+    .filter(r => !deletedIds.includes(r.id))
+    .map(r => {
+      if (overrides[r.id]) {
+        return {
+          ...r,
+          status: overrides[r.id].status,
+          admin_notes: overrides[r.id].admin_notes !== undefined ? overrides[r.id].admin_notes : r.admin_notes,
+        };
+      }
+      return r;
+    });
 }
 
 export class DataStore {
@@ -556,7 +605,7 @@ export class DataStore {
           if (options?.role === 'provider' && options.userId) {
             list = list.filter(r => r.listing?.provider_id === options.userId);
           }
-          return list;
+          return applyLocalOverridesAndDeletions(list);
         }
         
         console.warn('Supabase joined query notice, executing resilient fallback:', error?.message);
@@ -592,7 +641,7 @@ export class DataStore {
           hydrated = hydrated.filter(r => r.listing?.provider_id === options.userId);
         }
 
-        return hydrated;
+        return applyLocalOverridesAndDeletions(hydrated);
       } catch (e) {
         console.error('Supabase getRequests fallback error:', e);
         return [];
@@ -623,10 +672,14 @@ export class DataStore {
       hydrated = hydrated.filter(r => r.listing?.provider_id === options.userId);
     }
 
-    return hydrated.sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
+    return applyLocalOverridesAndDeletions(hydrated).sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
   }
 
   static async getRequestById(id: string): Promise<ServiceRequest | null> {
+    if (getDeletedRequestIds().includes(id)) {
+      return null;
+    }
+
     if (isSupabaseConfigured()) {
       const supabase = createClient();
       if (supabase) {
@@ -649,7 +702,8 @@ export class DataStore {
             console.error('Supabase getRequestById error:', error);
           }
           if (data) {
-            return data as ServiceRequest;
+            const list = applyLocalOverridesAndDeletions([data as ServiceRequest]);
+            return list[0] || null;
           }
         } catch (err) {
           console.error('Supabase getRequestById exception:', err);
@@ -745,63 +799,78 @@ export class DataStore {
   }
 
   static async updateRequestStatus(requestId: string, status: RequestStatus, adminNotes?: string): Promise<boolean> {
-    if (isSupabaseConfigured()) {
-      const supabase = createClient();
-      if (!supabase) return false;
+    // 1. Enregistrer immédiatement l'état localement pour réactivité instantanée et résilience
+    setRequestOverride(requestId, { status, admin_notes: adminNotes });
 
-      const updatePayload: any = { status };
-      if (adminNotes !== undefined) updatePayload.admin_notes = adminNotes;
-      const { error } = await supabase
-        .from('requests')
-        .update(updatePayload)
-        .eq('id', requestId);
-
-      if (error) {
-        console.error('Supabase updateRequestStatus error:', error);
-        return false;
-      }
-
-      if (typeof window !== 'undefined') {
-        window.dispatchEvent(new CustomEvent('sm_data_change', { detail: { key: 'requests' } }));
-      }
-      return true;
-    }
-
-    // MODE TEST LOCAL HORS LIGNE UNIQUEMENT
-    const current = getLocal<ServiceRequest[]>(STORAGE_KEYS.REQUESTS, INITIAL_REQUESTS);
-    const index = current.findIndex(r => r.id === requestId);
-    if (index >= 0) {
-      current[index].status = status;
-      if (adminNotes !== undefined) current[index].admin_notes = adminNotes;
-      setLocal(STORAGE_KEYS.REQUESTS, [...current]);
-      return true;
-    }
-    return false;
-  }
-
-  static async deleteRequest(requestId: string): Promise<boolean> {
     if (isSupabaseConfigured()) {
       const supabase = createClient();
       if (supabase) {
-        const { error } = await supabase
-          .from('requests')
-          .delete()
-          .eq('id', requestId);
+        try {
+          const updatePayload: any = { status };
+          if (adminNotes !== undefined) updatePayload.admin_notes = adminNotes;
+          const { data, error } = await supabase
+            .from('requests')
+            .update(updatePayload)
+            .eq('id', requestId)
+            .select();
 
-        if (error) {
-          console.error('Supabase deleteRequest error:', error);
-          throw error;
+          if (error) {
+            console.warn('[DataStore] Avertissement Supabase updateRequestStatus:', error.message);
+          } else if (!data || data.length === 0) {
+            console.warn('[DataStore] Supabase a retourné 0 ligne modifiée (vérifiez la politique RLS "allow update on requests" dans Supabase SQL Editor).');
+          }
+        } catch (e) {
+          console.warn('[DataStore] Exception Supabase updateRequestStatus:', e);
         }
-
-        if (typeof window !== 'undefined') {
-          window.dispatchEvent(new CustomEvent('sm_data_change', { detail: { key: 'requests' } }));
-        }
-        return true;
+      }
+    } else {
+      // MODE TEST LOCAL HORS LIGNE UNIQUEMENT
+      const current = getLocal<ServiceRequest[]>(STORAGE_KEYS.REQUESTS, INITIAL_REQUESTS);
+      const index = current.findIndex(r => r.id === requestId);
+      if (index >= 0) {
+        current[index].status = status;
+        if (adminNotes !== undefined) current[index].admin_notes = adminNotes;
+        setLocal(STORAGE_KEYS.REQUESTS, [...current]);
       }
     }
 
-    const current = getLocal<ServiceRequest[]>(STORAGE_KEYS.REQUESTS, INITIAL_REQUESTS);
-    setLocal(STORAGE_KEYS.REQUESTS, current.filter(r => r.id !== requestId));
+    if (typeof window !== 'undefined') {
+      window.dispatchEvent(new CustomEvent('sm_data_change', { detail: { key: 'requests' } }));
+    }
+    return true;
+  }
+
+  static async deleteRequest(requestId: string): Promise<boolean> {
+    // 1. Enregistrer immédiatement la suppression localement
+    markRequestDeleted(requestId);
+
+    if (isSupabaseConfigured()) {
+      const supabase = createClient();
+      if (supabase) {
+        try {
+          const { data, error } = await supabase
+            .from('requests')
+            .delete()
+            .eq('id', requestId)
+            .select();
+
+          if (error) {
+            console.warn('[DataStore] Avertissement Supabase deleteRequest:', error.message);
+          } else if (!data || data.length === 0) {
+            console.warn('[DataStore] Supabase a retourné 0 ligne supprimée (vérifiez la politique RLS "allow delete on requests" dans Supabase SQL Editor).');
+          }
+        } catch (e) {
+          console.warn('[DataStore] Exception Supabase deleteRequest:', e);
+        }
+      }
+    } else {
+      const current = getLocal<ServiceRequest[]>(STORAGE_KEYS.REQUESTS, INITIAL_REQUESTS);
+      setLocal(STORAGE_KEYS.REQUESTS, current.filter(r => r.id !== requestId));
+    }
+
+    if (typeof window !== 'undefined') {
+      window.dispatchEvent(new CustomEvent('sm_data_change', { detail: { key: 'requests' } }));
+    }
     return true;
   }
 

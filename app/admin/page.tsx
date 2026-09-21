@@ -965,7 +965,7 @@ export default function AdminDashboardPage() {
                         <div className="p-4 rounded-2xl bg-gradient-to-r from-emerald-50 via-teal-50 to-emerald-50 border-2 border-emerald-400 text-emerald-950 space-y-1.5 shadow-xs">
                           <div className="flex items-center gap-2 font-serif font-bold text-sm text-emerald-900">
                             <span className="material-symbols-outlined text-emerald-600 text-xl material-symbols-fill">check_circle</span>
-                            <span>✓ Demande acceptée par le prestataire : {providerName} pour la famille {clientName}</span>
+                            <span>✓ Demande acceptée par (prestataire : {providerName}) pour (client : {clientName})</span>
                           </div>
                           <p className="text-xs text-emerald-900 leading-relaxed">
                             Le prestataire a validé sa disponibilité. Il est invité à appeler le client sous 24h. En tant que coordinateur, vous disposez des numéros directs des deux parties ci-dessous.
@@ -977,7 +977,7 @@ export default function AdminDashboardPage() {
                         <div className="p-4 rounded-2xl bg-rose-50 border-2 border-rose-200 text-rose-950 space-y-1.5 shadow-xs">
                           <div className="flex items-center gap-2 font-serif font-bold text-sm text-rose-900">
                             <span className="material-symbols-outlined text-rose-600 text-xl">cancel</span>
-                            <span>✕ Demande déclinée par le prestataire : {providerName} pour la famille {clientName}</span>
+                            <span>✕ Demande déclinée par (prestataire : {providerName}) pour (client : {clientName})</span>
                           </div>
                           <p className="text-xs text-rose-900 leading-relaxed">
                             Le prestataire a décliné ce créneau. Le client a été notifié sur son espace personnel.

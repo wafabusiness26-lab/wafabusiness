@@ -459,10 +459,10 @@ export const Navbar: React.FC = () => {
                                       </div>
                                       <p className="font-bold text-xs text-on-surface group-hover:text-primary transition mt-1 truncate">
                                         {isAccepted 
-                                          ? `✓ ${providerName} a accepté ${clientName}`
+                                          ? `✓ Demande acceptée par ${providerName} pour ${clientName}`
                                           : isDeclined 
-                                          ? `✕ ${providerName} a décliné ${clientName}`
-                                          : `${clientName} a réservé ${providerName}`}
+                                          ? `✕ Demande déclinée par ${providerName} pour ${clientName}`
+                                          : `Nouvelle demande : ${clientName} pour ${providerName}`}
                                       </p>
                                       <p className="text-[11px] text-on-surface-variant truncate">
                                         {req.address_details || req.listing?.location || 'Alger'} • {req.listing?.title || 'Prestation'}
